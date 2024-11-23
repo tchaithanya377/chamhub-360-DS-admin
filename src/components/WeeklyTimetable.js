@@ -150,5 +150,4 @@ const WeeklyTimetable = () => {
     </div>
   );
 };
-
 export default WeeklyTimetable;
