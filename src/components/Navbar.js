@@ -1,6 +1,17 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { FaTachometerAlt, FaUserGraduate, FaChalkboardTeacher, FaBook, FaLink, FaTasks, FaPlus, FaUsersCog } from "react-icons/fa";
+import {
+  FaTachometerAlt,
+  FaUserGraduate,
+  FaChalkboardTeacher,
+  FaBook,
+  FaLink,
+  FaTasks,
+  FaPlus,
+  FaUsersCog,
+  FaCalendarAlt,
+  FaClipboardList,
+} from "react-icons/fa";
 
 const AdminNavbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -14,48 +25,39 @@ const AdminNavbar = () => {
     { name: "Courses", path: "/courses", icon: <FaBook /> },
     { name: "Add Course", path: "/addcourse", icon: <FaPlus /> },
     { name: "Relationships", path: "/relationships", icon: <FaLink /> },
-    { name: "Faculty Assignments", path: "/FacultyAssignments", icon: <FaTasks /> },
+    { name: "Faculty Assignments", path: "/facultyassignments", icon: <FaTasks /> },
+    { name: "No Dues", path: "/nodues", icon: <FaClipboardList /> },
+    { name: "No Dues Management", path: "/noduesmanagement", icon: <FaUsersCog /> },
+    { name: "Weekly Timetable", path: "/weeklytimetable", icon: <FaCalendarAlt /> },
+    { name: "Create Timetable", path: "/createtimetable", icon: <FaPlus /> },
   ];
 
   return (
-    <nav className="bg-gray-900 text-white shadow-lg">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <nav className="bg-gray-900 text-white shadow-lg sticky top-0 z-50">
+      <div className="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
+          {/* Brand */}
           <div className="flex items-center">
-            <h1 className="text-2xl font-bold text-orange-500">
+            <Link to="/dashboard" className="text-2xl font-bold text-orange-500">
               CampusHub360
-            </h1>
-            <div className="hidden md:block">
-              <div className="ml-10 flex items-center space-x-6">
-                {links.map((link) => (
-                  <Link
-                    key={link.name}
-                    to={link.path}
-                    className="flex items-center px-3 py-2 text-sm font-medium rounded-md hover:bg-orange-500 hover:text-white transition duration-200"
-                  >
-                    {link.icon}
-                    <span className="ml-2">{link.name}</span>
-                  </Link>
-                ))}
-              </div>
-            </div>
+            </Link>
           </div>
-          <div className="hidden md:flex items-center space-x-4">
-            <button
-              className="p-2 rounded-full bg-gray-800 hover:bg-gray-700 transition duration-200"
-              aria-label="Notifications"
-            >
-              <i className="fas fa-bell text-orange-500"></i>
-            </button>
-            <button className="flex items-center space-x-2 bg-gray-800 px-3 py-2 rounded-md hover:bg-gray-700 transition duration-200">
-              <img
-                className="h-8 w-8 rounded-full"
-                src="https://via.placeholder.com/150"
-                alt="Admin"
-              />
-              <span>Admin</span>
-            </button>
+
+          {/* Desktop Links */}
+          <div className="hidden md:flex flex-wrap items-center justify-between space-x-4">
+            {links.map((link) => (
+              <Link
+                key={link.name}
+                to={link.path}
+                className="flex items-center px-3 py-2 text-sm font-medium rounded-md hover:bg-orange-500 hover:text-white transition duration-200"
+              >
+                {link.icon}
+                <span className="ml-2">{link.name}</span>
+              </Link>
+            ))}
           </div>
+
+          {/* Hamburger Menu */}
           <div className="md:hidden">
             <button
               onClick={() => setIsOpen(!isOpen)}
@@ -80,6 +82,7 @@ const AdminNavbar = () => {
           </div>
         </div>
       </div>
+
       {/* Mobile Menu */}
       <div className={`md:hidden ${isOpen ? "block" : "hidden"} bg-gray-800`}>
         <div className="px-4 pt-4 pb-2 space-y-1">

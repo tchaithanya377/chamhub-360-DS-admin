@@ -12,22 +12,25 @@ import AddCourse from "./components/AddCourse";
 import Courses from "./components/Courses";
 import Relationships from "./components/Relationships";
 import FacultyAssignments from "./components/FacultyAssignments";
-
+import NoDues from "./components/NoDues";
+import NoDuesManagement from "./components/NoDuesManagement";
+import WeeklyTimetable from "./components/WeeklyTimetable";
+import CreateTimetable from "./components/CreateTImeTable";
 function App() {
   return (
     <Router>
       <div className="min-h-screen bg-gray-100">
         <Routes>
-          <Route
-            path="/"
-            element={<Login />}
-          />
+          {/* Login Route */}
+          <Route path="/" element={<Login />} />
+
+          {/* Authenticated Routes (with AdminNavbar) */}
           <Route
             path="*"
             element={
               <>
-                <AdminNavbar /> 
-                <div className="">
+                <AdminNavbar />
+                <div className="p-4">
                   <Routes>
                     <Route path="/dashboard" element={<AdminDashboard />} />
                     <Route path="/students" element={<Students />} />
@@ -39,9 +42,13 @@ function App() {
                     <Route path="/courses" element={<Courses />} />
                     <Route path="/relationships" element={<Relationships />} />
                     <Route
-                      path="/FacultyAssignments"
+                      path="/facultyassignments"
                       element={<FacultyAssignments />}
                     />
+                    <Route path="/nodues" element={<NoDues />} />
+                    <Route path="/noduesmanagement" element={<NoDuesManagement />} />
+                    <Route path='/weeklytimetable' element={<WeeklyTimetable />} />
+                    <Route path='/createtimetable' element={<CreateTimetable />} />
                   </Routes>
                 </div>
               </>
