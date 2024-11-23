@@ -1,18 +1,20 @@
 import React, { useEffect, useState } from "react";
-import { collection, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "../firebase";
 
 function Courses() {
   const [courses, setCourses] = useState([]);
   const [instructors, setInstructors] = useState({});
   const [selectedCourse, setSelectedCourse] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isViewing, setIsViewing] = useState(false);
 
   // Fetch Courses and Instructors from Firebase
   useEffect(() => {
     const fetchCoursesAndInstructors = async () => {
       try {
         const years = ["I", "II", "III", "IV"];
-        const sections = ["A", "B", "C"]; // Add all sections you have
+        const sections = ["A", "B", "C"];
 
         let coursesList = [];
         for (const year of years) {
@@ -57,14 +59,64 @@ function Courses() {
   }, []);
 
   const handleViewDetails = (course) => {
-    alert(`Viewing details for ${course.courseName}`);
     setSelectedCourse(course);
-    // Add logic to display more detailed information about the course
+    setIsViewing(true);
   };
 
   const handleEditCourse = (course) => {
-    alert(`Editing course: ${course.courseName}`);
-    // Add logic to navigate to an edit form or handle editing inline
+    setSelectedCourse(course);
+    setIsEditing(true);
+  };
+
+  const handleDeleteCourse = async (course) => {
+    if (window.confirm(`Are you sure you want to delete the course: ${course.courseName}?`)) {
+      try {
+        const courseRef = doc(
+          db,
+          `courses/Computer Science & Engineering (Data Science)/years/${course.year}/sections/${course.section}/courseDetails/${course.id}`
+        );
+        await deleteDoc(courseRef);
+
+        setCourses((prevCourses) =>
+          prevCourses.filter((existingCourse) => existingCourse.id !== course.id)
+        );
+        alert("Course deleted successfully!");
+      } catch (error) {
+        console.error("Error deleting course:", error);
+        alert("Failed to delete the course. Please try again.");
+      }
+    }
+  };
+
+  const handleSaveChanges = async () => {
+    if (!selectedCourse) return;
+
+    try {
+      const courseRef = doc(
+        db,
+        `courses/Computer Science & Engineering (Data Science)/years/${selectedCourse.year}/sections/${selectedCourse.section}/courseDetails/${selectedCourse.id}`
+      );
+      await updateDoc(courseRef, {
+        courseName: selectedCourse.courseName,
+        courseCode: selectedCourse.courseCode,
+        coveragePercentage: selectedCourse.coveragePercentage || "N/A",
+        syllabusCoverage: selectedCourse.syllabusCoverage || "N/A",
+        unitsCompleted: selectedCourse.unitsCompleted || "N/A",
+        deviationReasons: selectedCourse.deviationReasons || "N/A",
+      });
+
+      setCourses((prevCourses) =>
+        prevCourses.map((course) =>
+          course.id === selectedCourse.id ? selectedCourse : course
+        )
+      );
+
+      setIsEditing(false);
+      alert("Course updated successfully!");
+    } catch (error) {
+      console.error("Error saving changes:", error);
+      alert("Failed to update course. Please try again.");
+    }
   };
 
   return (
@@ -88,6 +140,12 @@ function Courses() {
                 <strong>Course Name:</strong> {course.courseName}
               </p>
               <p className="text-gray-600">
+                <strong>Year:</strong> {course.year}
+              </p>
+              <p className="text-gray-600">
+                <strong>Section:</strong> {course.section}
+              </p>
+              <p className="text-gray-600">
                 <strong>Instructor:</strong>{" "}
                 {instructors[course.instructor] || "N/A"}
               </p>
@@ -99,14 +157,6 @@ function Courses() {
                 <strong>Syllabus Coverage:</strong>{" "}
                 {course.syllabusCoverage || "N/A"}
               </p>
-              <p className="text-gray-600">
-                <strong>Units Completed:</strong>{" "}
-                {course.unitsCompleted || "N/A"}
-              </p>
-              <p className="text-gray-600">
-                <strong>Deviation Reasons:</strong>{" "}
-                {course.deviationReasons || "N/A"}
-              </p>
               <div className="mt-4 flex justify-between">
                 <button
                   onClick={() => handleViewDetails(course)}
@@ -116,9 +166,15 @@ function Courses() {
                 </button>
                 <button
                   onClick={() => handleEditCourse(course)}
-                  className="bg-gray-300 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-400"
+                  className="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600"
                 >
                   Edit
+                </button>
+                <button
+                  onClick={() => handleDeleteCourse(course)}
+                  className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600"
+                >
+                  Delete
                 </button>
               </div>
             </div>
@@ -131,13 +187,22 @@ function Courses() {
         )}
       </div>
 
-      {/* Optional: Display Selected Course Details */}
-      {selectedCourse && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+      {/* View Modal */}
+      {isViewing && selectedCourse && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-lg w-full">
-            <h2 className="text-2xl font-bold mb-4">{selectedCourse.courseName}</h2>
+            <h2 className="text-2xl font-bold mb-4">Course Details</h2>
+            <p>
+              <strong>Course Name:</strong> {selectedCourse.courseName}
+            </p>
             <p>
               <strong>Course Code:</strong> {selectedCourse.courseCode}
+            </p>
+            <p>
+              <strong>Year:</strong> {selectedCourse.year}
+            </p>
+            <p>
+              <strong>Section:</strong> {selectedCourse.section}
             </p>
             <p>
               <strong>Instructor:</strong>{" "}
@@ -160,7 +225,7 @@ function Courses() {
               {selectedCourse.deviationReasons || "N/A"}
             </p>
             <button
-              onClick={() => setSelectedCourse(null)}
+              onClick={() => setIsViewing(false)}
               className="mt-4 bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
             >
               Close
@@ -168,6 +233,66 @@ function Courses() {
           </div>
         </div>
       )}
+
+      {/* Edit Modal */}
+{isEditing && selectedCourse && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+    <div className="bg-white rounded-lg p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto">
+      <h2 className="text-2xl font-bold mb-4">Edit Course</h2>
+      <div className="space-y-4">
+        {Object.entries(selectedCourse).map(([key, value]) => {
+          // Exclude fields that shouldn't be edited
+          if (key === "id" || key === "year" || key === "section") {
+            return (
+              <div key={key}>
+                <label className="block font-semibold mb-1 capitalize">
+                  {key === "year" ? "Year" : key === "section" ? "Section" : key}
+                </label>
+                <input
+                  type="text"
+                  value={value}
+                  disabled
+                  className="w-full p-2 border border-gray-300 rounded-md bg-gray-100"
+                />
+              </div>
+            );
+          }
+          return (
+            <div key={key}>
+              <label className="block font-semibold mb-1 capitalize">
+                {key.replace(/([A-Z])/g, " $1").trim()}
+              </label>
+              <input
+                type="text"
+                name={key}
+                value={value}
+                onChange={(e) =>
+                  setSelectedCourse((prev) => ({ ...prev, [key]: e.target.value }))
+                }
+                className="w-full p-2 border border-gray-300 rounded-md"
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-4 flex justify-end">
+        <button
+          onClick={() => setIsEditing(false)}
+          className="bg-gray-300 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-400"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSaveChanges}
+          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+        >
+          Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
     </div>
   );
 }
