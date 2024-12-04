@@ -1,25 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { db } from '../firebase'; // Import Firebase configuration
-import { collection, doc, getDocs, addDoc, getDoc } from 'firebase/firestore';
+import React, { useState, useEffect } from "react";
+import { db } from "../firebase"; // Import Firebase configuration
+import { collection, doc, getDocs, addDoc, getDoc } from "firebase/firestore";
 
 const Timetable = () => {
-  const [year, setYear] = useState('');
-  const [section, setSection] = useState('');
+  const [year, setYear] = useState("");
+  const [section, setSection] = useState("");
   const [courses, setCourses] = useState([]);
   const [faculty, setFaculty] = useState({});
   const [students, setStudents] = useState([]);
   const [formData, setFormData] = useState({
-    day: '',
-    courseId: '',
-    facultyId: '',
-    room: '',
-    startTime: '',
-    endTime: '',
+    day: "",
+    courseId: "",
+    facultyId: "",
+    room: "",
+    startTime: "",
+    endTime: "",
     periods: [],
     combinedPeriods: false,
   });
 
-  const periodsList = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th'];
+  const periodsList = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th"];
 
   // Fetch data for the selected year and section
   useEffect(() => {
@@ -37,7 +37,7 @@ const Timetable = () => {
             coursesData.push({
               id: doc.id,
               courseName: course.courseName,
-              instructor: course.instructor,
+              instructor: course.instructor || null,
             });
             if (course.instructor) {
               instructorIds.add(course.instructor);
@@ -46,15 +46,14 @@ const Timetable = () => {
           setCourses(coursesData);
 
           // Fetch faculty
+          const facultySnapshot = await getDocs(collection(db, "faculty"));
           const facultyMap = {};
-          await Promise.all(
-            [...instructorIds].map(async (id) => {
-              const facultyDoc = await getDoc(doc(db, 'faculty', id));
-              if (facultyDoc.exists()) {
-                facultyMap[id] = facultyDoc.data().name;
-              }
-            })
-          );
+
+          facultySnapshot.docs.forEach((doc) => {
+            const facultyData = doc.data();
+            facultyMap[doc.id] = facultyData.name || "Unknown Faculty";
+          });
+
           setFaculty(facultyMap);
 
           // Fetch students
@@ -66,7 +65,7 @@ const Timetable = () => {
           }));
           setStudents(studentsData);
         } catch (error) {
-          console.error('Error fetching data:', error.message);
+          console.error("Error fetching data:", error.message);
         }
       }
     };
@@ -79,7 +78,7 @@ const Timetable = () => {
     e.preventDefault();
 
     if (!formData.periods.length) {
-      alert('Please select at least one period.');
+      alert("Please select at least one period.");
       return;
     }
 
@@ -94,21 +93,21 @@ const Timetable = () => {
 
       const timetablePath = `/timetables/${year}/${section}`;
       await addDoc(collection(db, timetablePath), timetableData);
-      alert('Timetable added successfully!');
+      alert("Timetable added successfully!");
 
       // Reset form
       setFormData({
-        day: '',
-        courseId: '',
-        facultyId: '',
-        room: '',
-        startTime: '',
-        endTime: '',
+        day: "",
+        courseId: "",
+        facultyId: "",
+        room: "",
+        startTime: "",
+        endTime: "",
         periods: [],
         combinedPeriods: false,
       });
     } catch (error) {
-      console.error('Error adding timetable:', error.message);
+      console.error("Error adding timetable:", error.message);
     }
   };
 

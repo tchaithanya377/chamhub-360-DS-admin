@@ -1,278 +1,302 @@
-import React, { useEffect, useState } from "react";
-import { db } from "../firebase";
-import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
+import React, { useState, useEffect } from "react";
+import { doc, getDoc, collection, getDocs } from "firebase/firestore";
+import { db } from "../firebase"; // Your Firebase configuration
 
-const NoDuesManagement = () => {
-  const [courses, setCourses] = useState([]);
-  const [faculty, setFaculty] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [selectedYear, setSelectedYear] = useState("");
-  const [selectedSection, setSelectedSection] = useState("");
-  const [filteredCourses, setFilteredCourses] = useState([]);
-  const [noDuesStatus, setNoDuesStatus] = useState({});
+const NoDuesPage = () => {
+  const [academicYear, setAcademicYear] = useState("");
+  const [section, setSection] = useState("");
+  const [data, setData] = useState([]);
+  const [facultyMap, setFacultyMap] = useState({});
+  const [courseMap, setCourseMap] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [sortOrder, setSortOrder] = useState("asc");
+
+  const academicYears = ["I", "II", "III", "IV"];
+  const sections = ["A", "B", "C", "D"];
+
+  // Fetch faculty data
+  const fetchFacultyData = async () => {
+    try {
+      const facultySnapshot = await getDocs(collection(db, "faculty"));
+      const faculty = {};
+      facultySnapshot.forEach((doc) => {
+        faculty[doc.id] = doc.data().name || "Unknown Faculty";
+      });
+      setFacultyMap(faculty);
+    } catch (err) {
+      console.error("Error fetching faculty data:", err);
+    }
+  };
+
+  // Fetch course details
+  const fetchCourseData = async (academicYear, section) => {
+    try {
+      const coursePath = `/courses/Computer Science & Engineering (Data Science)/years/${academicYear}/sections/${section}/courseDetails`;
+      const courseSnapshot = await getDocs(collection(db, coursePath));
+      const courses = {};
+      courseSnapshot.forEach((doc) => {
+        const courseData = doc.data();
+        courses[doc.id] = {
+          courseName: courseData.courseName || "Unknown Course",
+          facultyId: courseData.instructor || "Unknown Faculty",
+        };
+      });
+      setCourseMap(courses);
+    } catch (err) {
+      console.error("Error fetching course data:", err);
+    }
+  };
+
+  // Fetch student roll numbers and enrich data
+  const fetchStudentData = async (academicYear, section, students) => {
+    const enrichedData = await Promise.all(
+      students.map(async (student) => {
+        try {
+          const studentDoc = doc(db, `students/${academicYear}/${section}/${student.id}`);
+          const studentSnap = await getDoc(studentDoc);
+          if (studentSnap.exists()) {
+            const studentData = studentSnap.data();
+            return { ...student, rollNo: studentData.rollNo || "N/A" };
+          }
+        } catch (err) {
+          console.error("Error fetching student data:", err);
+        }
+        return { ...student, rollNo: "N/A" }; // Fallback in case of error
+      })
+    );
+    return enrichedData;
+  };
 
   useEffect(() => {
-    const fetchCoursesAndFaculty = async () => {
-      try {
-        const department = "Computer Science & Engineering (Data Science)";
-        const years = ["I", "II", "III", "IV"];
-        const sections = ["A", "B", "C"];
-        const fetchedCourses = [];
-
-        // Fetch courses for each year and section
-        for (const year of years) {
-          for (const section of sections) {
-            const coursePath = `courses/${department}/years/${year}/sections/${section}/courseDetails`;
-            const courseCollection = collection(db, coursePath);
-            const courseSnapshot = await getDocs(courseCollection);
-            courseSnapshot.forEach((doc) => {
-              fetchedCourses.push({
-                id: doc.id,
-                ...doc.data(),
-                year,
-                section,
-              });
-            });
-          }
-        }
-
-        setCourses(fetchedCourses);
-
-        // Fetch Faculty
-        const facultySnapshot = await getDocs(collection(db, "faculty"));
-        const fetchedFaculty = facultySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setFaculty(fetchedFaculty);
-      } catch (error) {
-        console.error("Error fetching courses or faculty:", error);
-      }
-    };
-
-    fetchCoursesAndFaculty();
+    fetchFacultyData();
   }, []);
 
-  const fetchStudents = async () => {
-    if (!selectedYear || !selectedSection) return;
+  const fetchData = async () => {
+    if (!academicYear || !section) {
+      setError("Please select both academic year and section.");
+      return;
+    }
+
+    setIsLoading(true);
+    setError("");
 
     try {
-      const studentsPath = `students/${selectedYear}/${selectedSection}`;
-      const studentsSnapshot = await getDocs(collection(db, studentsPath));
-      const fetchedStudents = studentsSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setStudents(fetchedStudents);
+      await fetchCourseData(academicYear, section);
 
-      // Calculate no dues status for each course
-      const status = {};
-      for (const course of filteredCourses) {
-        const completed = fetchedStudents.filter(
-          (student) =>
-            student.noDues &&
-            student.noDues[course.id] &&
-            student.noDues[course.id].status === "Completed"
-        ).length;
+      const docPath = `/noDues/${academicYear}/${section}/tDgqwVLD6u4h5LYStOFD`;
+      const docRef = doc(db, docPath);
+      const docSnap = await getDoc(docRef);
 
-        const pending = fetchedStudents.length - completed;
-
-        status[course.id] = { completed, pending };
+      if (docSnap.exists()) {
+        const documentData = docSnap.data();
+        let enrichedData = await fetchStudentData(academicYear, section, documentData.students || []);
+        enrichedData = enrichedData.sort((a, b) => {
+          if (sortOrder === "asc") {
+            return a.rollNo.localeCompare(b.rollNo);
+          } else {
+            return b.rollNo.localeCompare(a.rollNo);
+          }
+        });
+        setData(enrichedData);
+      } else {
+        setError("No data found for the selected year and section.");
+        setData([]);
       }
-      setNoDuesStatus(status);
-    } catch (error) {
-      console.error("Error fetching students:", error);
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      setError("Failed to fetch data. Please try again.");
     }
+
+    setIsLoading(false);
   };
 
-  const handleFilter = () => {
-    const filtered = courses.filter(
-      (course) =>
-        (!selectedYear || course.year === selectedYear) &&
-        (!selectedSection || course.section === selectedSection)
+  const handleFetchClick = () => {
+    fetchData();
+  };
+
+  const handleSortClick = () => {
+    setSortOrder((prevOrder) => (prevOrder === "asc" ? "desc" : "asc"));
+    setData((prevData) =>
+      [...prevData].sort((a, b) => {
+        if (sortOrder === "asc") {
+          return b.rollNo.localeCompare(a.rollNo);
+        } else {
+          return a.rollNo.localeCompare(b.rollNo);
+        }
+      })
     );
-    setFilteredCourses(filtered);
-
-    // Fetch students for the selected filters
-    fetchStudents();
   };
 
-  const handleToggleNoDues = async (courseId, currentStatus) => {
-    try {
-      const course = filteredCourses.find((c) => c.id === courseId);
-      const coursePath = `courses/Computer Science & Engineering (Data Science)/years/${course.year}/sections/${course.section}/courseDetails/${course.id}`;
-      const courseRef = doc(db, coursePath);
-
-      // Toggle the no dues status
-      const updatedStatus = !currentStatus;
-      await updateDoc(courseRef, {
-        noDuesGenerated: updatedStatus,
-      });
-
-      // Update the UI
-      setFilteredCourses((prev) =>
-        prev.map((c) =>
-          c.id === courseId ? { ...c, noDuesGenerated: updatedStatus } : c
-        )
-      );
-      alert(`No Dues ${updatedStatus ? "granted" : "removed"} successfully!`);
-    } catch (error) {
-      console.error("Error updating no dues status:", error);
-      alert("Failed to update no dues status.");
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case "completed":
+        return "bg-green-200 text-green-800";
+      case "pending":
+        return "bg-yellow-200 text-yellow-800";
+      case "failed":
+        return "bg-red-200 text-red-800";
+      default:
+        return "bg-gray-200 text-gray-800";
     }
   };
+
+  const getNameById = (id, map) => map[id] || "N/A";
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold text-center text-gray-800 mb-8">
-          No Dues Management - Edit and Modify
+    <div className="min-h-screen bg-gradient-to-r from-blue-400 via-purple-500 to-blue-400 flex flex-col items-center py-10">
+      <div className="bg-white shadow-lg rounded-lg p-8 w-full max-w-7xl">
+        <h1 className="text-4xl font-extrabold text-gray-800 text-center mb-8">
+          No Dues Data
         </h1>
 
-        {/* Filter Section */}
-        <div className="mb-6 bg-white shadow rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-700 mb-4">
-            Filter Courses
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block font-semibold text-gray-700 mb-1">
-                Select Year
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <label className="block text-gray-700 font-medium mb-2">
+                Academic Year:
               </label>
               <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-md"
+                value={academicYear}
+                onChange={(e) => setAcademicYear(e.target.value)}
+                className="w-full p-3 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
               >
-                <option value="">-- Select Year --</option>
-                {["I", "II", "III", "IV"].map((year) => (
+                <option value="">Select Year</option>
+                {academicYears.map((year) => (
                   <option key={year} value={year}>
                     {year}
                   </option>
                 ))}
               </select>
             </div>
-            <div>
-              <label className="block font-semibold text-gray-700 mb-1">
-                Select Section
+            <div className="flex-1">
+              <label className="block text-gray-700 font-medium mb-2">
+                Section:
               </label>
               <select
-                value={selectedSection}
-                onChange={(e) => setSelectedSection(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-md"
+                value={section}
+                onChange={(e) => setSection(e.target.value)}
+                className="w-full p-3 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
               >
-                <option value="">-- Select Section --</option>
-                {["A", "B", "C"].map((section) => (
-                  <option key={section} value={section}>
-                    {section}
+                <option value="">Select Section</option>
+                {sections.map((sec) => (
+                  <option key={sec} value={sec}>
+                    {sec}
                   </option>
                 ))}
               </select>
             </div>
-            <div className="flex items-end">
-              <button
-                onClick={handleFilter}
-                className="w-full bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600 transition"
-              >
-                Filter
-              </button>
-            </div>
           </div>
+          <button
+            onClick={handleFetchClick}
+            disabled={isLoading}
+            className={`w-full p-3 rounded-md text-white font-semibold ${
+              isLoading
+                ? "bg-purple-300 cursor-not-allowed"
+                : "bg-purple-600 hover:bg-purple-700"
+            }`}
+          >
+            {isLoading ? "Fetching..." : "Fetch Data"}
+          </button>
         </div>
 
-        {/* Courses List */}
-        <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-700 mb-4">
-            Courses List
-          </h2>
-          {filteredCourses.length > 0 ? (
-            <table className="min-w-full border-collapse border border-gray-300">
-              <thead>
-                <tr className="bg-gray-200">
-                  <th className="p-3 border border-gray-300">Course Name</th>
-                  <th className="p-3 border border-gray-300">Faculty</th>
-                  <th className="p-3 border border-gray-300">Year</th>
-                  <th className="p-3 border border-gray-300">Section</th>
-                  <th className="p-3 border border-gray-300">No Dues</th>
-                  <th className="p-3 border border-gray-300">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredCourses.map((course) => {
-                  const assignedFaculty = faculty.find(
-                    (fac) => fac.id === course.instructor
-                  );
-                  return (
-                    <tr key={course.id} className="hover:bg-gray-100">
-                      <td className="p-3 border border-gray-300">
-                        {course.courseName}
-                      </td>
-                      <td className="p-3 border border-gray-300">
-                        {assignedFaculty ? assignedFaculty.name : "N/A"}
-                      </td>
-                      <td className="p-3 border border-gray-300">
-                        {course.year}
-                      </td>
-                      <td className="p-3 border border-gray-300">
-                        {course.section}
-                      </td>
-                      <td className="p-3 border border-gray-300 text-center">
-                        {course.noDuesGenerated ? "Yes" : "No"}
-                      </td>
-                      <td className="p-3 border border-gray-300 text-center">
-                        <button
-                          onClick={() =>
-                            handleToggleNoDues(
-                              course.id,
-                              course.noDuesGenerated
-                            )
-                          }
-                          className={`px-4 py-2 rounded-md ${
-                            course.noDuesGenerated
-                              ? "bg-red-500 text-white hover:bg-red-600"
-                              : "bg-green-500 text-white hover:bg-green-600"
-                          }`}
-                        >
-                          {course.noDuesGenerated ? "Remove No Dues" : "Grant No Dues"}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          ) : (
-            <p className="text-gray-600 text-center">
-              No courses found for the selected filters.
-            </p>
-          )}
-        </div>
+        {error && (
+          <p className="text-red-600 text-center mt-4 text-lg">{error}</p>
+        )}
 
-        {/* No Dues Pending List */}
-        {Object.keys(noDuesStatus).length > 0 && (
-          <div className="bg-white shadow rounded-lg p-6 mt-6">
-            <h2 className="text-xl font-semibold text-gray-700 mb-4">
-              No Dues Pending List
+        {data.length > 0 && (
+          <div className="mt-8 overflow-x-auto">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">
+              Data for Academic Year: {academicYear}, Section: {section}
             </h2>
-            <table className="min-w-full border-collapse border border-gray-300">
+            <table className="min-w-full bg-white border border-gray-300 shadow-md rounded-lg">
               <thead>
-                <tr className="bg-gray-200">
-                  <th className="p-3 border border-gray-300">Course Name</th>
-                  <th className="p-3 border border-gray-300">Completed</th>
-                  <th className="p-3 border border-gray-300">Pending</th>
+                <tr className="bg-purple-500 text-white text-left">
+                  <th className="py-4 px-6 cursor-pointer" onClick={handleSortClick}>
+                    Roll No {sortOrder === "asc" ? "↑" : "↓"}
+                  </th>
+                  <th className="py-4 px-6">Name</th>
+                  <th className="py-4 px-6">Coordinators</th>
+                  <th className="py-4 px-6">Courses</th>
+                  <th className="py-4 px-6">Courses Faculty</th>
+                  <th className="py-4 px-6">Mentors</th>
+                  <th className="py-4 px-6">Status</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredCourses.map((course) => (
-                  <tr key={course.id} className="hover:bg-gray-100">
-                    <td className="p-3 border border-gray-300">
-                      {course.courseName}
+                {data.map((student, index) => (
+                  <tr
+                    key={index}
+                    className={`border-b ${
+                      index % 2 === 0 ? "bg-gray-100" : "bg-white"
+                    }`}
+                  >
+                    <td className="py-3 px-6">{student.rollNo || "N/A"}</td>
+                    <td className="py-3 px-6">{student.name || "N/A"}</td>
+                    <td className="py-3 px-6">
+                      {student.coordinators?.map((coordinator, idx) => (
+                        <p key={idx}>
+                          {getNameById(coordinator.id, facultyMap)} -{" "}
+                          <span
+                            className={`inline-block px-2 py-1 rounded-full ${getStatusColor(
+                              coordinator.status
+                            )}`}
+                          >
+                            {coordinator.status}
+                          </span>
+                        </p>
+                      ))}
                     </td>
-                    <td className="p-3 border border-gray-300 text-center">
-                      {noDuesStatus[course.id]?.completed || 0}
+                    <td className="py-3 px-6">
+                      {student.courses?.map((course, idx) => (
+                        <p key={idx}>
+                          {courseMap[course.id]?.courseName} -{" "}
+                          <span
+                            className={`inline-block px-2 py-1 rounded-full ${getStatusColor(
+                              course.status
+                            )}`}
+                          >
+                            {course.status}
+                          </span>
+                        </p>
+                      ))}
                     </td>
-                    <td className="p-3 border border-gray-300 text-center">
-                      {noDuesStatus[course.id]?.pending || 0}
+                    <td className="py-3 px-6">
+                      {student.courses_faculty?.map((courseFaculty, idx) => (
+                        <p key={idx}>
+                          {facultyMap[courseFaculty.facultyId] || "Unknown Faculty"} -{" "}
+                          <span
+                            className={`inline-block px-2 py-1 rounded-full ${getStatusColor(
+                              courseFaculty.status
+                            )}`}
+                          >
+                            {courseFaculty.status}
+                          </span>
+                        </p>
+                      ))}
+                    </td>
+                    <td className="py-3 px-6">
+                      {student.mentors?.map((mentor, idx) => (
+                        <p key={idx}>
+                          {getNameById(mentor.id, facultyMap)} -{" "}
+                          <span
+                            className={`inline-block px-2 py-1 rounded-full ${getStatusColor(
+                              mentor.status
+                            )}`}
+                          >
+                            {mentor.status}
+                          </span>
+                        </p>
+                      ))}
+                    </td>
+                    <td className="py-3 px-6">
+                      <span
+                        className={`inline-block px-4 py-2 rounded-full text-sm font-semibold ${getStatusColor(
+                          student.status
+                        )}`}
+                      >
+                        {student.status || "N/A"}
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -285,4 +309,4 @@ const NoDuesManagement = () => {
   );
 };
 
-export default NoDuesManagement;
+export default NoDuesPage;

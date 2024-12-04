@@ -16,6 +16,11 @@ import NoDues from "./components/NoDues";
 import NoDuesManagement from "./components/NoDuesManagement";
 import WeeklyTimetable from "./components/WeeklyTimetable";
 import CreateTimetable from "./components/CreateTImeTable";
+import CreateUser from "./components/CreateUser";
+import Attendance from "./components/Attendance";
+import CoordinatorAssignment from "./components/CoordinatorAssignment";
+import MentorAssignment from "./components/MentorAssignment";
+import ManageMentors from "./components/ManageMentors";
 function App() {
   return (
     <Router>
@@ -49,6 +54,11 @@ function App() {
                     <Route path="/noduesmanagement" element={<NoDuesManagement />} />
                     <Route path='/weeklytimetable' element={<WeeklyTimetable />} />
                     <Route path='/createtimetable' element={<CreateTimetable />} />
+                    <Route path='/createuser' element={<CreateUser />} />
+                    <Route path='attendance' element={<Attendance />} />
+                    <Route path="/coordinator" element={<CoordinatorAssignment />} />
+                    <Route path="/mentor" element={<MentorAssignment />} />
+                    <Route path="/managementors" element={<ManageMentors />} />
                   </Routes>
                 </div>
               </>

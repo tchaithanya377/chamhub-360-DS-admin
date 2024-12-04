@@ -11,25 +11,74 @@ import {
   FaUsersCog,
   FaCalendarAlt,
   FaClipboardList,
+  FaUserPlus,
+  FaUserCheck,
+  FaChalkboard,
+  FaUserTie,
+  FaUsers,
 } from "react-icons/fa";
 
 const AdminNavbar = () => {
   const [isOpen, setIsOpen] = useState(false);
 
-  const links = [
+  const dropdowns = [
+    {
+      title: "Students",
+      links: [
+        { name: "Manage Students", path: "/students", icon: <FaUserGraduate /> },
+        { name: "Add Student", path: "/addstudent", icon: <FaPlus /> },
+      ],
+    },
+    {
+      title: "Faculty",
+      links: [
+        { name: "Manage Faculty", path: "/faculty", icon: <FaChalkboardTeacher /> },
+        { name: "Add Faculty", path: "/addfaculty", icon: <FaPlus /> },
+      ],
+    },
+    {
+      title: "Courses",
+      links: [
+        { name: "Manage Courses", path: "/courses", icon: <FaBook /> },
+        { name: "Add Course", path: "/addcourse", icon: <FaPlus /> },
+      ],
+    },
+    {
+      title: "Timetable",
+      links: [
+        { name: "Weekly Timetable", path: "/weeklytimetable", icon: <FaCalendarAlt /> },
+        { name: "Create Timetable", path: "/createtimetable", icon: <FaPlus /> },
+      ],
+    },
+    {
+      title: "Assign",
+      links: [
+        { name: "Faculty Assignments", path: "/facultyassignments", icon: <FaTasks /> },
+        { name: "course Assignment", path: "/relationships", icon: <FaUserTie /> },
+        { name: "Coordinator Assignment", path: "/coordinator", icon: <FaChalkboard /> },
+      ],
+    },
+    {
+      title: "No Dues",
+      links: [
+        { name: "No Dues", path: "/nodues", icon: <FaClipboardList /> },
+        { name: "Manage Dues", path: "/noduesmanagement", icon: <FaUsersCog /> },
+      ],
+    },
+    {
+      title: "Mentors",
+      links: [
+        { name: "Manage Mentors", path: "/managementors", icon: <FaUsers /> },
+        { name: "Assign Mentors", path: "/mentor", icon: <FaUsers /> },
+
+      ],
+    },
+  ];
+
+  const otherLinks = [
     { name: "Dashboard", path: "/dashboard", icon: <FaTachometerAlt /> },
-    { name: "Students", path: "/students", icon: <FaUserGraduate /> },
-    { name: "Add Student", path: "/addstudent", icon: <FaPlus /> },
-    { name: "Faculty", path: "/faculty", icon: <FaChalkboardTeacher /> },
-    { name: "Add Faculty", path: "/addfaculty", icon: <FaPlus /> },
-    { name: "Courses", path: "/courses", icon: <FaBook /> },
-    { name: "Add Course", path: "/addcourse", icon: <FaPlus /> },
-    { name: "Relationships", path: "/relationships", icon: <FaLink /> },
-    { name: "Faculty Assignments", path: "/facultyassignments", icon: <FaTasks /> },
-    { name: "No Dues", path: "/nodues", icon: <FaClipboardList /> },
-    { name: "No Dues Management", path: "/noduesmanagement", icon: <FaUsersCog /> },
-    { name: "Weekly Timetable", path: "/weeklytimetable", icon: <FaCalendarAlt /> },
-    { name: "Create Timetable", path: "/createtimetable", icon: <FaPlus /> },
+    { name: "Create User", path: "/createuser", icon: <FaUserPlus /> },
+    { name: "Attendance", path: "/attendance", icon: <FaUserCheck /> },
   ];
 
   return (
@@ -37,19 +86,49 @@ const AdminNavbar = () => {
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Brand */}
-          <div className="flex items-center">
-            <Link to="/dashboard" className="text-2xl font-bold text-orange-500">
-              CampusHub360
-            </Link>
-          </div>
+          <Link to="/dashboard" className="text-2xl font-extrabold text-orange-500">
+            CampusHub360
+          </Link>
 
           {/* Desktop Links */}
-          <div className="hidden md:flex flex-wrap items-center justify-between space-x-4">
-            {links.map((link) => (
+          <div className="hidden md:flex space-x-6">
+            {/* Dropdowns */}
+            {dropdowns.map((dropdown, index) => (
+              <div key={index} className="relative group">
+                <button className="flex items-center text-sm font-semibold hover:text-orange-500">
+                  {dropdown.title}
+                  <svg
+                    className="ml-1 h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                </button>
+                <div className="absolute left-0 hidden group-hover:block bg-gray-800 shadow-lg mt-2 rounded-md z-10">
+                  {dropdown.links.map((link) => (
+                    <Link
+                      key={link.name}
+                      to={link.path}
+                      className="flex items-center px-4 py-2 text-sm hover:bg-orange-500 rounded-md hover:text-white transition duration-200"
+                    >
+                      {link.icon}
+                      <span className="ml-2">{link.name}</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {/* Other Links */}
+            {otherLinks.map((link) => (
               <Link
                 key={link.name}
                 to={link.path}
-                className="flex items-center px-3 py-2 text-sm font-medium rounded-md hover:bg-orange-500 hover:text-white transition duration-200"
+                className="flex items-center text-sm font-semibold hover:text-orange-500 transition duration-200"
               >
                 {link.icon}
                 <span className="ml-2">{link.name}</span>
@@ -57,47 +136,71 @@ const AdminNavbar = () => {
             ))}
           </div>
 
-          {/* Hamburger Menu */}
-          <div className="md:hidden">
-            <button
-              onClick={() => setIsOpen(!isOpen)}
-              className="bg-gray-800 p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 transition duration-200"
-              aria-label="Toggle menu"
-            >
-              <svg
-                className="h-6 w-6"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M4 6h16M4 12h16m-7 6h7"
-                />
-              </svg>
+          {/* Profile */}
+          <div className="hidden md:flex items-center space-x-4">
+            <button className="p-2 rounded-full bg-gray-800 hover:bg-gray-700">
+              <i className="fas fa-bell text-orange-500"></i>
+            </button>
+            <button className="flex items-center bg-gray-800 px-3 py-2 rounded-md hover:bg-gray-700">
+              <img
+                className="h-8 w-8 rounded-full"
+                src="https://via.placeholder.com/150"
+                alt="Admin"
+              />
+              <span className="ml-2">Admin</span>
             </button>
           </div>
+
+          {/* Mobile Menu */}
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="md:hidden bg-gray-800 p-2 rounded-md"
+          >
+            <svg
+              className="h-6 w-6 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16m-7 6h7"></path>
+            </svg>
+          </button>
         </div>
       </div>
 
-      {/* Mobile Menu */}
-      <div className={`md:hidden ${isOpen ? "block" : "hidden"} bg-gray-800`}>
-        <div className="px-4 pt-4 pb-2 space-y-1">
-          {links.map((link) => (
+      {/* Mobile Dropdown */}
+      {isOpen && (
+        <div className="md:hidden bg-gray-800">
+          {dropdowns.map((dropdown, index) => (
+            <div key={index} className="py-2">
+              <div className="text-sm font-semibold text-gray-400 px-4">{dropdown.title}</div>
+              {dropdown.links.map((link) => (
+                <Link
+                  key={link.name}
+                  to={link.path}
+                  className="flex items-center px-4 py-2 text-sm hover:bg-orange-500 hover:text-white transition duration-200"
+                >
+                  {link.icon}
+                  <span className="ml-2">{link.name}</span>
+                </Link>
+              ))}
+            </div>
+          ))}
+
+          {otherLinks.map((link) => (
             <Link
               key={link.name}
               to={link.path}
-              className="flex items-center px-3 py-2 text-sm font-medium rounded-md hover:bg-orange-500 hover:text-white transition duration-200"
+              className="flex items-center px-4 py-2 text-sm hover:bg-orange-500 hover:text-white transition duration-200"
             >
               {link.icon}
               <span className="ml-2">{link.name}</span>
             </Link>
           ))}
         </div>
-      </div>
+      )}
     </nav>
   );
 };
