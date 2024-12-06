@@ -16,6 +16,7 @@ import {
   FaChalkboard,
   FaUserTie,
   FaUsers,
+  FaSignOutAlt,
 } from "react-icons/fa";
 
 const AdminNavbar = () => {
@@ -54,7 +55,7 @@ const AdminNavbar = () => {
       title: "Assign",
       links: [
         { name: "Faculty Assignments", path: "/facultyassignments", icon: <FaTasks /> },
-        { name: "course Assignment", path: "/relationships", icon: <FaUserTie /> },
+        { name: "Course Assignment", path: "/relationships", icon: <FaUserTie /> },
         { name: "Coordinator Assignment", path: "/coordinator", icon: <FaChalkboard /> },
       ],
     },
@@ -70,7 +71,6 @@ const AdminNavbar = () => {
       links: [
         { name: "Manage Mentors", path: "/managementors", icon: <FaUsers /> },
         { name: "Assign Mentors", path: "/mentor", icon: <FaUsers /> },
-
       ],
     },
   ];
@@ -91,14 +91,14 @@ const AdminNavbar = () => {
           </Link>
 
           {/* Desktop Links */}
-          <div className="hidden md:flex space-x-6">
+          <div className="hidden md:flex space-x-6 items-center">
             {/* Dropdowns */}
             {dropdowns.map((dropdown, index) => (
               <div key={index} className="relative group">
-                <button className="flex items-center text-sm font-semibold hover:text-orange-500">
+                <button className="flex items-center text-sm font-semibold hover:text-orange-500 transition">
                   {dropdown.title}
                   <svg
-                    className="ml-1 h-4 w-4"
+                    className="ml-1 h-4 w-4 transform group-hover:rotate-180 transition"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="2"
@@ -108,7 +108,7 @@ const AdminNavbar = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"></path>
                   </svg>
                 </button>
-                <div className="absolute left-0 hidden group-hover:block bg-gray-800 shadow-lg mt-2 rounded-md z-10">
+                <div className="absolute left-0 hidden group-hover:flex flex-col bg-gray-800 shadow-lg mt-2 rounded-md z-10">
                   {dropdown.links.map((link) => (
                     <Link
                       key={link.name}
@@ -134,21 +134,15 @@ const AdminNavbar = () => {
                 <span className="ml-2">{link.name}</span>
               </Link>
             ))}
-          </div>
 
-          {/* Profile */}
-          <div className="hidden md:flex items-center space-x-4">
-            <button className="p-2 rounded-full bg-gray-800 hover:bg-gray-700">
-              <i className="fas fa-bell text-orange-500"></i>
-            </button>
-            <button className="flex items-center bg-gray-800 px-3 py-2 rounded-md hover:bg-gray-700">
-              <img
-                className="h-8 w-8 rounded-full"
-                src="https://via.placeholder.com/150"
-                alt="Admin"
-              />
-              <span className="ml-2">Admin</span>
-            </button>
+            {/* Logout */}
+            <Link
+              to="/logout"
+              className="flex items-center text-sm font-semibold text-red-500 hover:text-red-400 transition duration-200"
+            >
+              <FaSignOutAlt />
+              <span className="ml-2">Logout</span>
+            </Link>
           </div>
 
           {/* Mobile Menu */}
@@ -199,6 +193,15 @@ const AdminNavbar = () => {
               <span className="ml-2">{link.name}</span>
             </Link>
           ))}
+
+          {/* Logout */}
+          <Link
+            to="/logout"
+            className="flex items-center px-4 py-2 text-sm text-red-500 hover:text-red-400 transition duration-200"
+          >
+            <FaSignOutAlt />
+            <span className="ml-2">Logout</span>
+          </Link>
         </div>
       )}
     </nav>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { doc, getDoc, collection, getDocs } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { db } from "../firebase"; // Your Firebase configuration
 
 const NoDuesPage = () => {
@@ -84,25 +84,30 @@ const NoDuesPage = () => {
     try {
       await fetchCourseData(academicYear, section);
 
-      const docPath = `/noDues/${academicYear}/${section}/tDgqwVLD6u4h5LYStOFD`;
-      const docRef = doc(db, docPath);
-      const docSnap = await getDoc(docRef);
+      // Query to fetch the latest noDues document
+      const noDuesCollectionRef = collection(db, "noDues", academicYear, section);
+      const latestNoDuesQuery = query(noDuesCollectionRef, orderBy("generatedAt", "desc"), limit(1));
+      const querySnapshot = await getDocs(latestNoDuesQuery);
 
-      if (docSnap.exists()) {
-        const documentData = docSnap.data();
-        let enrichedData = await fetchStudentData(academicYear, section, documentData.students || []);
-        enrichedData = enrichedData.sort((a, b) => {
-          if (sortOrder === "asc") {
-            return a.rollNo.localeCompare(b.rollNo);
-          } else {
-            return b.rollNo.localeCompare(a.rollNo);
-          }
-        });
-        setData(enrichedData);
-      } else {
+      if (querySnapshot.empty) {
         setError("No data found for the selected year and section.");
         setData([]);
+        setIsLoading(false);
+        return;
       }
+
+      const latestNoDuesDoc = querySnapshot.docs[0];
+      const documentData = latestNoDuesDoc.data();
+
+      let enrichedData = await fetchStudentData(academicYear, section, documentData.students || []);
+      enrichedData = enrichedData.sort((a, b) => {
+        if (sortOrder === "asc") {
+          return a.rollNo.localeCompare(b.rollNo);
+        } else {
+          return b.rollNo.localeCompare(a.rollNo);
+        }
+      });
+      setData(enrichedData);
     } catch (err) {
       console.error("Error fetching data:", err);
       setError("Failed to fetch data. Please try again.");
