@@ -5,7 +5,6 @@ import {
   FaUserGraduate,
   FaChalkboardTeacher,
   FaBook,
-  FaLink,
   FaTasks,
   FaPlus,
   FaUsersCog,
@@ -20,7 +19,8 @@ import {
 } from "react-icons/fa";
 
 const AdminNavbar = () => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState(null);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   const dropdowns = [
     {
@@ -81,54 +81,70 @@ const AdminNavbar = () => {
     { name: "Attendance", path: "/attendance", icon: <FaUserCheck /> },
   ];
 
+  const handleMobileClose = () => {
+    setIsMobileOpen(false);
+    setOpenDropdown(null); // Close any open dropdowns
+  };
+
   return (
-    <nav className="bg-gray-900 text-white shadow-lg sticky top-0 z-50">
+    <nav className="bg-gray-900 text-white shadow-lg">
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Brand */}
-          <Link to="/dashboard" className="text-2xl font-extrabold text-orange-500">
+          <Link to="/dashboard" className="text-2xl font-bold text-orange-500">
             CampusHub360
           </Link>
 
           {/* Desktop Links */}
           <div className="hidden md:flex space-x-6 items-center">
-            {/* Dropdowns */}
             {dropdowns.map((dropdown, index) => (
-              <div key={index} className="relative group">
-                <button className="flex items-center text-sm font-semibold hover:text-orange-500 transition">
+              <div key={index} className="relative">
+                <button
+                  className="flex items-center text-sm font-semibold text-gray-300 focus:outline-none"
+                  onClick={() =>
+                    setOpenDropdown(openDropdown === index ? null : index)
+                  }
+                >
                   {dropdown.title}
                   <svg
-                    className="ml-1 h-4 w-4 transform group-hover:rotate-180 transition"
+                    className={`ml-1 h-4 w-4 transform ${
+                      openDropdown === index ? "rotate-180" : ""
+                    } transition`}
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="2"
                     viewBox="0 0 24 24"
                     xmlns="http://www.w3.org/2000/svg"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"></path>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19 9l-7 7-7-7"
+                    ></path>
                   </svg>
                 </button>
-                <div className="absolute left-0 hidden group-hover:flex flex-col bg-gray-800 shadow-lg mt-2 rounded-md z-10">
-                  {dropdown.links.map((link) => (
-                    <Link
-                      key={link.name}
-                      to={link.path}
-                      className="flex items-center px-4 py-2 text-sm hover:bg-orange-500 rounded-md hover:text-white transition duration-200"
-                    >
-                      {link.icon}
-                      <span className="ml-2">{link.name}</span>
-                    </Link>
-                  ))}
-                </div>
+                {openDropdown === index && (
+                  <div className="absolute left-0 flex flex-col bg-gray-800 shadow-lg mt-2 rounded-md z-10 w-48">
+                    {dropdown.links.map((link) => (
+                      <Link
+                        key={link.name}
+                        to={link.path}
+                        className="flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-orange-500 hover:text-white rounded-md"
+                      >
+                        {link.icon}
+                        <span className="ml-2">{link.name}</span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
 
-            {/* Other Links */}
             {otherLinks.map((link) => (
               <Link
                 key={link.name}
                 to={link.path}
-                className="flex items-center text-sm font-semibold hover:text-orange-500 transition duration-200"
+                className="flex items-center text-sm font-semibold text-gray-300"
               >
                 {link.icon}
                 <span className="ml-2">{link.name}</span>
@@ -138,16 +154,16 @@ const AdminNavbar = () => {
             {/* Logout */}
             <Link
               to="/logout"
-              className="flex items-center text-sm font-semibold text-red-500 hover:text-red-400 transition duration-200"
+              className="flex items-center text-sm font-semibold text-red-500"
             >
               <FaSignOutAlt />
               <span className="ml-2">Logout</span>
             </Link>
           </div>
 
-          {/* Mobile Menu */}
+          {/* Mobile Menu Button */}
           <button
-            onClick={() => setIsOpen(!isOpen)}
+            onClick={() => setIsMobileOpen(!isMobileOpen)}
             className="md:hidden bg-gray-800 p-2 rounded-md"
           >
             <svg
@@ -165,16 +181,19 @@ const AdminNavbar = () => {
       </div>
 
       {/* Mobile Dropdown */}
-      {isOpen && (
+      {isMobileOpen && (
         <div className="md:hidden bg-gray-800">
           {dropdowns.map((dropdown, index) => (
             <div key={index} className="py-2">
-              <div className="text-sm font-semibold text-gray-400 px-4">{dropdown.title}</div>
+              <div className="text-sm font-semibold text-gray-400 px-4">
+                {dropdown.title}
+              </div>
               {dropdown.links.map((link) => (
                 <Link
                   key={link.name}
                   to={link.path}
-                  className="flex items-center px-4 py-2 text-sm hover:bg-orange-500 hover:text-white transition duration-200"
+                  onClick={handleMobileClose}
+                  className="flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-orange-500 hover:text-white"
                 >
                   {link.icon}
                   <span className="ml-2">{link.name}</span>
@@ -187,7 +206,8 @@ const AdminNavbar = () => {
             <Link
               key={link.name}
               to={link.path}
-              className="flex items-center px-4 py-2 text-sm hover:bg-orange-500 hover:text-white transition duration-200"
+              onClick={handleMobileClose}
+              className="flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-orange-500 hover:text-white"
             >
               {link.icon}
               <span className="ml-2">{link.name}</span>
@@ -196,8 +216,9 @@ const AdminNavbar = () => {
 
           {/* Logout */}
           <Link
-            to="/logout"
-            className="flex items-center px-4 py-2 text-sm text-red-500 hover:text-red-400 transition duration-200"
+            to="/"
+            onClick={handleMobileClose}
+            className="flex items-center px-4 py-2 text-sm text-red-500 hover:text-red-400"
           >
             <FaSignOutAlt />
             <span className="ml-2">Logout</span>

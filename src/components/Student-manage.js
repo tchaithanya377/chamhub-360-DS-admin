@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEye } from "@fortawesome/free-solid-svg-icons";
+import { faEye, faSave, faTimes } from "@fortawesome/free-solid-svg-icons";
 import { db } from "../firebase";
 import { collection, collectionGroup, getDocs, doc, updateDoc } from "firebase/firestore";
-
 
 const Students = () => {
   const [students, setStudents] = useState([]);
@@ -31,11 +30,16 @@ const Students = () => {
 
         const fetchedStudents = querySnapshot.docs.map((doc) => ({
           id: doc.id,
+          path: doc.ref.parent.path, // To keep the path for updates
           ...doc.data(),
         }));
 
         // Sort students by roll number in ascending order
-        fetchedStudents.sort((a, b) => a.rollNo - b.rollNo);
+        fetchedStudents.sort((a, b) => {
+          const rollA = parseInt(a.rollNo, 10) || 0;
+          const rollB = parseInt(b.rollNo, 10) || 0;
+          return rollA - rollB;
+        });
 
         setStudents(fetchedStudents);
       } catch (error) {
@@ -56,7 +60,7 @@ const Students = () => {
 
   // Handle Popup View
   const handleViewClick = (student) => {
-    setSelectedStudent(student);
+    setSelectedStudent({ ...student }); // Create a shallow copy to avoid direct mutations
     setShowPopup(true);
   };
 
@@ -75,9 +79,19 @@ const Students = () => {
   const saveChanges = async () => {
     try {
       const studentRef = doc(db, selectedStudent.path, selectedStudent.id);
-      await updateDoc(studentRef, selectedStudent);
+      const updatedData = { ...selectedStudent };
+      delete updatedData.path; // Remove extra metadata before saving
+      await updateDoc(studentRef, updatedData);
+
+      // Update state locally for better user feedback
+      setStudents((prev) =>
+        prev.map((student) =>
+          student.id === selectedStudent.id ? { ...updatedData, id: student.id, path: student.path } : student
+        )
+      );
+
       alert("Student details updated successfully!");
-      setShowPopup(false);
+      handleClosePopup();
     } catch (error) {
       console.error("Error updating student:", error);
       alert("Failed to update student details.");
@@ -85,7 +99,7 @@ const Students = () => {
   };
 
   return (
-    <div className="container mx-auto p-4 bg-gray-100 min-h-screen">
+    <div className="container mx-auto p-4 bg-gray-50 min-h-screen">
       <div className="flex justify-between items-center mb-4">
         {/* Search Input */}
         <input
@@ -93,7 +107,7 @@ const Students = () => {
           placeholder="Search by name"
           value={searchTerm}
           onChange={handleSearch}
-          className="p-2 border border-gray-300 rounded-md"
+          className="p-2 border border-gray-300 rounded-md w-1/3"
         />
 
         {/* Filters */}
@@ -103,7 +117,7 @@ const Students = () => {
             onChange={(e) => setFilterYear(e.target.value)}
             className="p-2 border border-gray-300 rounded-md"
           >
-            <option value="">Select Year</option>
+            <option value="">All Years</option>
             <option value="I">1st Year</option>
             <option value="II">2nd Year</option>
             <option value="III">3rd Year</option>
@@ -114,7 +128,7 @@ const Students = () => {
             onChange={(e) => setFilterSection(e.target.value)}
             className="p-2 border border-gray-300 rounded-md"
           >
-            <option value="">Select Section</option>
+            <option value="">All Sections</option>
             <option value="A">Section A</option>
             <option value="B">Section B</option>
             <option value="C">Section C</option>
@@ -123,15 +137,15 @@ const Students = () => {
       </div>
 
       {/* Students Table */}
-      <div className="overflow-x-auto">
-        <table className="min-w-full bg-white rounded-md">
+      <div className="overflow-x-auto bg-white shadow-md rounded-lg">
+        <table className="min-w-full">
           <thead>
-            <tr>
-              <th className="py-2 px-4 border-b">Name</th>
-              <th className="py-2 px-4 border-b">Roll No</th>
-              <th className="py-2 px-4 border-b">Year</th>
-              <th className="py-2 px-4 border-b">Section</th>
-              <th className="py-2 px-4 border-b">Actions</th>
+            <tr className="bg-gray-200">
+              <th className="py-2 px-4 border">Name</th>
+              <th className="py-2 px-4 border">Roll No</th>
+              <th className="py-2 px-4 border">Year</th>
+              <th className="py-2 px-4 border">Section</th>
+              <th className="py-2 px-4 border">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -140,11 +154,11 @@ const Students = () => {
                 key={student.id}
                 className="hover:bg-gray-100 transition-colors"
               >
-                <td className="py-2 px-4 border-b">{student.name}</td>
-                <td className="py-2 px-4 border-b">{student.rollNo}</td>
-                <td className="py-2 px-4 border-b">{student.Year}</td>
-                <td className="py-2 px-4 border-b">{student.Section}</td>
-                <td className="py-2 px-4 border-b">
+                <td className="py-2 px-4 border">{student.name}</td>
+                <td className="py-2 px-4 border">{student.rollNo}</td>
+                <td className="py-2 px-4 border">{student.Year}</td>
+                <td className="py-2 px-4 border">{student.Section}</td>
+                <td className="py-2 px-4 border">
                   <button
                     onClick={() => handleViewClick(student)}
                     className="text-blue-500 hover:underline"
@@ -160,7 +174,7 @@ const Students = () => {
 
       {/* Popup */}
       {showPopup && selectedStudent && (
-        <div className="fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50">
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg w-96 max-h-full overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-bold">Edit Student Details</h2>
@@ -168,14 +182,14 @@ const Students = () => {
                 onClick={handleClosePopup}
                 className="text-gray-500 hover:text-gray-700"
               >
-                ✖
+                <FontAwesomeIcon icon={faTimes} />
               </button>
             </div>
             <div className="space-y-4">
               {Object.entries(selectedStudent).map(
                 ([key, value]) =>
                   key !== "id" &&
-                  typeof value !== "object" && (
+                  key !== "path" && (
                     <div key={key} className="flex flex-col">
                       <label className="font-semibold capitalize text-gray-700">
                         {key}

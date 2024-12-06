@@ -1,6 +1,7 @@
-import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import AdminNavbar from "./components/Navbar"; // Import the AdminNavbar
+import React, { useState, useEffect } from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { auth } from "./firebase"; // Import Firebase auth
+import AdminNavbar from "./components/Navbar";
 import AdminDashboard from "./components/AdminDashboard";
 import Login from "./components/Login";
 import ManageStudents from "./components/Students";
@@ -21,19 +22,42 @@ import Attendance from "./components/Attendance";
 import CoordinatorAssignment from "./components/CoordinatorAssignment";
 import MentorAssignment from "./components/MentorAssignment";
 import ManageMentors from "./components/ManageMentors";
+import MakeAdmin from "./components/MakeAdmin";
+
+// Private Route Wrapper
+const PrivateRoute = ({ children }) => {
+  const [authenticated, setAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check authentication state
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      setAuthenticated(!!user);
+      setLoading(false);
+    });
+    return () => unsubscribe(); // Cleanup subscription
+  }, []);
+
+  if (loading) {
+    return <div className="text-center mt-10">Loading...</div>; // Add a loading spinner if needed
+  }
+
+  return authenticated ? children : <Navigate to="/" />;
+};
+
 function App() {
   return (
     <Router>
       <div className="min-h-screen bg-gray-100">
         <Routes>
-          {/* Login Route */}
+          {/* Public Login Route */}
           <Route path="/" element={<Login />} />
 
-          {/* Authenticated Routes (with AdminNavbar) */}
+          {/* Authenticated Routes */}
           <Route
             path="*"
             element={
-              <>
+              <PrivateRoute>
                 <AdminNavbar />
                 <div className="p-4">
                   <Routes>
@@ -46,22 +70,20 @@ function App() {
                     <Route path="/addcourse" element={<AddCourse />} />
                     <Route path="/courses" element={<Courses />} />
                     <Route path="/relationships" element={<Relationships />} />
-                    <Route
-                      path="/facultyassignments"
-                      element={<FacultyAssignments />}
-                    />
+                    <Route path="/facultyassignments" element={<FacultyAssignments />} />
                     <Route path="/nodues" element={<NoDues />} />
                     <Route path="/noduesmanagement" element={<NoDuesManagement />} />
-                    <Route path='/weeklytimetable' element={<WeeklyTimetable />} />
-                    <Route path='/createtimetable' element={<CreateTimetable />} />
-                    <Route path='/createuser' element={<CreateUser />} />
-                    <Route path='attendance' element={<Attendance />} />
+                    <Route path="/weeklytimetable" element={<WeeklyTimetable />} />
+                    <Route path="/createtimetable" element={<CreateTimetable />} />
+                    <Route path="/createuser" element={<CreateUser />} />
+                    <Route path="/attendance" element={<Attendance />} />
                     <Route path="/coordinator" element={<CoordinatorAssignment />} />
                     <Route path="/mentor" element={<MentorAssignment />} />
                     <Route path="/managementors" element={<ManageMentors />} />
+                    <Route path="/make-admin" element={<MakeAdmin />} />
                   </Routes>
                 </div>
-              </>
+              </PrivateRoute>
             }
           />
         </Routes>
