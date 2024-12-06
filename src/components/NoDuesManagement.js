@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { doc, getDoc, collection, getDocs } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { db } from "../firebase"; // Your Firebase configuration
 
 const NoDuesPage = () => {
@@ -84,12 +84,13 @@ const NoDuesPage = () => {
     try {
       await fetchCourseData(academicYear, section);
 
-      const docPath = `/noDues/${academicYear}/${section}/tDgqwVLD6u4h5LYStOFD`;
-      const docRef = doc(db, docPath);
-      const docSnap = await getDoc(docRef);
+      const collectionPath = `/noDues/${academicYear}/${section}`;
+      const q = query(collection(db, collectionPath), orderBy("timestamp", "desc"), limit(1));
+      const querySnapshot = await getDocs(q);
 
-      if (docSnap.exists()) {
-        const documentData = docSnap.data();
+      if (!querySnapshot.empty) {
+        const latestDoc = querySnapshot.docs[0];
+        const documentData = latestDoc.data();
         let enrichedData = await fetchStudentData(academicYear, section, documentData.students || []);
         enrichedData = enrichedData.sort((a, b) => {
           if (sortOrder === "asc") {
