@@ -135,11 +135,11 @@ const NoDuesPage = () => {
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
-      case "completed":
+      case "accepted":
         return "bg-green-200 text-green-800";
       case "pending":
         return "bg-yellow-200 text-yellow-800";
-      case "failed":
+      case "rejected":
         return "bg-red-200 text-red-800";
       default:
         return "bg-gray-200 text-gray-800";
