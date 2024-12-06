@@ -6,6 +6,8 @@ const NoDuesPage = () => {
   const [academicYear, setAcademicYear] = useState("");
   const [section, setSection] = useState("");
   const [data, setData] = useState([]);
+  const [facultyMap, setFacultyMap] = useState({});
+  const [courseMap, setCourseMap] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [sortOrder, setSortOrder] = useState("asc");
@@ -13,10 +15,40 @@ const NoDuesPage = () => {
   const academicYears = ["I", "II", "III", "IV"];
   const sections = ["A", "B", "C", "D"];
 
-  useEffect(() => {
-    // No initialization required here
-  }, []);
+  // Fetch faculty data
+  const fetchFacultyData = async () => {
+    try {
+      const facultySnapshot = await getDocs(collection(db, "faculty"));
+      const faculty = {};
+      facultySnapshot.forEach((doc) => {
+        faculty[doc.id] = doc.data().name || "Unknown Faculty";
+      });
+      setFacultyMap(faculty);
+    } catch (err) {
+      console.error("Error fetching faculty data:", err);
+    }
+  };
 
+  // Fetch course data
+  const fetchCourseData = async (academicYear, section) => {
+    try {
+      const coursePath = `/courses/Computer Science & Engineering (Data Science)/years/${academicYear}/sections/${section}/courseDetails`;
+      const courseSnapshot = await getDocs(collection(db, coursePath));
+      const courses = {};
+      courseSnapshot.forEach((doc) => {
+        const courseData = doc.data();
+        courses[doc.id] = {
+          courseName: courseData.courseName || "Unknown Course",
+          facultyId: courseData.instructor || "Unknown Faculty",
+        };
+      });
+      setCourseMap(courses);
+    } catch (err) {
+      console.error("Error fetching course data:", err);
+    }
+  };
+
+  // Fetch data
   const fetchData = async () => {
     if (!academicYear || !section) {
       setError("Please select both academic year and section.");
@@ -27,7 +59,7 @@ const NoDuesPage = () => {
     setError("");
 
     try {
-      // Query the latest document in the specified collection
+      // Fetch latest document based on timestamp
       const collectionPath = `/noDues/${academicYear}/${section}`;
       const q = query(collection(db, collectionPath), orderBy("timestamp", "desc"), limit(1));
       const querySnapshot = await getDocs(q);
@@ -37,19 +69,17 @@ const NoDuesPage = () => {
         const documentData = latestDoc.data();
 
         if (documentData && documentData.students) {
-          // Process the student data if available
-          const enrichedData = documentData.students.map((student, index) => ({
+          let enrichedData = documentData.students.map((student, index) => ({
             ...student,
-            rollNo: student.rollNo || `N/A (${index + 1})`, // Ensure roll number fallback
+            rollNo: student.rollNo || `N/A (${index + 1})`,
           }));
 
-          setData(
-            enrichedData.sort((a, b) =>
-              sortOrder === "asc"
-                ? a.rollNo.localeCompare(b.rollNo)
-                : b.rollNo.localeCompare(a.rollNo)
-            )
+          enrichedData = enrichedData.sort((a, b) =>
+            sortOrder === "asc"
+              ? a.rollNo.localeCompare(b.rollNo)
+              : b.rollNo.localeCompare(a.rollNo)
           );
+          setData(enrichedData);
         } else {
           setError("No student data found in the latest document.");
           setData([]);
@@ -80,6 +110,25 @@ const NoDuesPage = () => {
       )
     );
   };
+
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case "completed":
+        return "bg-green-200 text-green-800";
+      case "pending":
+        return "bg-yellow-200 text-yellow-800";
+      case "failed":
+        return "bg-red-200 text-red-800";
+      default:
+        return "bg-gray-200 text-gray-800";
+    }
+  };
+
+  const getNameById = (id, map) => map[id] || "N/A";
+
+  useEffect(() => {
+    fetchFacultyData();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-blue-400 via-purple-500 to-blue-400 flex flex-col items-center py-10">
@@ -154,6 +203,10 @@ const NoDuesPage = () => {
                     Roll No {sortOrder === "asc" ? "↑" : "↓"}
                   </th>
                   <th className="py-4 px-6">Name</th>
+                  <th className="py-4 px-6">Coordinators</th>
+                  <th className="py-4 px-6">Courses</th>
+                  <th className="py-4 px-6">Courses Faculty</th>
+                  <th className="py-4 px-6">Mentors</th>
                   <th className="py-4 px-6">Status</th>
                 </tr>
               </thead>
@@ -168,7 +221,67 @@ const NoDuesPage = () => {
                     <td className="py-3 px-6">{student.rollNo || "N/A"}</td>
                     <td className="py-3 px-6">{student.name || "N/A"}</td>
                     <td className="py-3 px-6">
-                      <span className="inline-block px-4 py-2 rounded-full text-sm font-semibold bg-green-200 text-green-800">
+                      {student.coordinators?.map((coordinator, idx) => (
+                        <p key={idx}>
+                          {getNameById(coordinator.id, facultyMap)} -{" "}
+                          <span
+                            className={`inline-block px-2 py-1 rounded-full ${getStatusColor(
+                              coordinator.status
+                            )}`}
+                          >
+                            {coordinator.status}
+                          </span>
+                        </p>
+                      ))}
+                    </td>
+                    <td className="py-3 px-6">
+                      {student.courses?.map((course, idx) => (
+                        <p key={idx}>
+                          {courseMap[course.id]?.courseName} -{" "}
+                          <span
+                            className={`inline-block px-2 py-1 rounded-full ${getStatusColor(
+                              course.status
+                            )}`}
+                          >
+                            {course.status}
+                          </span>
+                        </p>
+                      ))}
+                    </td>
+                    <td className="py-3 px-6">
+                      {student.courses_faculty?.map((courseFaculty, idx) => (
+                        <p key={idx}>
+                          {facultyMap[courseFaculty.facultyId] || "Unknown Faculty"} -{" "}
+                          <span
+                            className={`inline-block px-2 py-1 rounded-full ${getStatusColor(
+                              courseFaculty.status
+                            )}`}
+                          >
+                            {courseFaculty.status}
+                          </span>
+                        </p>
+                      ))}
+                    </td>
+                    <td className="py-3 px-6">
+                      {student.mentors?.map((mentor, idx) => (
+                        <p key={idx}>
+                          {getNameById(mentor.id, facultyMap)} -{" "}
+                          <span
+                            className={`inline-block px-2 py-1 rounded-full ${getStatusColor(
+                              mentor.status
+                            )}`}
+                          >
+                            {mentor.status}
+                          </span>
+                        </p>
+                      ))}
+                    </td>
+                    <td className="py-3 px-6">
+                      <span
+                        className={`inline-block px-4 py-2 rounded-full text-sm font-semibold ${getStatusColor(
+                          student.status
+                        )}`}
+                      >
                         {student.status || "N/A"}
                       </span>
                     </td>
