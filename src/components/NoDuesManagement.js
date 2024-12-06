@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { db } from "../firebase"; // Your Firebase configuration
 
 const NoDuesPage = () => {
@@ -29,7 +29,7 @@ const NoDuesPage = () => {
     }
   };
 
-  // Fetch course data
+  // Fetch course details
   const fetchCourseData = async (academicYear, section) => {
     try {
       const coursePath = `/courses/Computer Science & Engineering (Data Science)/years/${academicYear}/sections/${section}/courseDetails`;
@@ -48,7 +48,30 @@ const NoDuesPage = () => {
     }
   };
 
-  // Fetch data
+  // Fetch student roll numbers and enrich data
+  const fetchStudentData = async (academicYear, section, students) => {
+    const enrichedData = await Promise.all(
+      students.map(async (student) => {
+        try {
+          const studentDoc = doc(db, `students/${academicYear}/${section}/${student.id}`);
+          const studentSnap = await getDoc(studentDoc);
+          if (studentSnap.exists()) {
+            const studentData = studentSnap.data();
+            return { ...student, rollNo: studentData.rollNo || "N/A" };
+          }
+        } catch (err) {
+          console.error("Error fetching student data:", err);
+        }
+        return { ...student, rollNo: "N/A" }; // Fallback in case of error
+      })
+    );
+    return enrichedData;
+  };
+
+  useEffect(() => {
+    fetchFacultyData();
+  }, []);
+
   const fetchData = async () => {
     if (!academicYear || !section) {
       setError("Please select both academic year and section.");
@@ -59,35 +82,32 @@ const NoDuesPage = () => {
     setError("");
 
     try {
-      // Fetch latest document based on timestamp
-      const collectionPath = `/noDues/${academicYear}/${section}`;
-      const q = query(collection(db, collectionPath), orderBy("timestamp", "desc"), limit(1));
-      const querySnapshot = await getDocs(q);
+      await fetchCourseData(academicYear, section);
 
-      if (!querySnapshot.empty) {
-        const latestDoc = querySnapshot.docs[0];
-        const documentData = latestDoc.data();
+      // Query to fetch the latest noDues document
+      const noDuesCollectionRef = collection(db, "noDues", academicYear, section);
+      const latestNoDuesQuery = query(noDuesCollectionRef, orderBy("generatedAt", "desc"), limit(1));
+      const querySnapshot = await getDocs(latestNoDuesQuery);
 
-        if (documentData && documentData.students) {
-          let enrichedData = documentData.students.map((student, index) => ({
-            ...student,
-            rollNo: student.rollNo || `N/A (${index + 1})`,
-          }));
-
-          enrichedData = enrichedData.sort((a, b) =>
-            sortOrder === "asc"
-              ? a.rollNo.localeCompare(b.rollNo)
-              : b.rollNo.localeCompare(a.rollNo)
-          );
-          setData(enrichedData);
-        } else {
-          setError("No student data found in the latest document.");
-          setData([]);
-        }
-      } else {
+      if (querySnapshot.empty) {
         setError("No data found for the selected year and section.");
         setData([]);
+        setIsLoading(false);
+        return;
       }
+
+      const latestNoDuesDoc = querySnapshot.docs[0];
+      const documentData = latestNoDuesDoc.data();
+
+      let enrichedData = await fetchStudentData(academicYear, section, documentData.students || []);
+      enrichedData = enrichedData.sort((a, b) => {
+        if (sortOrder === "asc") {
+          return a.rollNo.localeCompare(b.rollNo);
+        } else {
+          return b.rollNo.localeCompare(a.rollNo);
+        }
+      });
+      setData(enrichedData);
     } catch (err) {
       console.error("Error fetching data:", err);
       setError("Failed to fetch data. Please try again.");
@@ -103,11 +123,13 @@ const NoDuesPage = () => {
   const handleSortClick = () => {
     setSortOrder((prevOrder) => (prevOrder === "asc" ? "desc" : "asc"));
     setData((prevData) =>
-      [...prevData].sort((a, b) =>
-        sortOrder === "asc"
-          ? b.rollNo.localeCompare(a.rollNo)
-          : a.rollNo.localeCompare(b.rollNo)
-      )
+      [...prevData].sort((a, b) => {
+        if (sortOrder === "asc") {
+          return b.rollNo.localeCompare(a.rollNo);
+        } else {
+          return a.rollNo.localeCompare(b.rollNo);
+        }
+      })
     );
   };
 
@@ -125,10 +147,6 @@ const NoDuesPage = () => {
   };
 
   const getNameById = (id, map) => map[id] || "N/A";
-
-  useEffect(() => {
-    fetchFacultyData();
-  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-blue-400 via-purple-500 to-blue-400 flex flex-col items-center py-10">
