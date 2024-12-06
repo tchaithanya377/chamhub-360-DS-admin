@@ -49,11 +49,11 @@ const NoDuesPage = () => {
   };
 
   // Fetch student roll numbers and enrich data
-  const fetchStudentData = async (academicYear, section, students) => {
+  const fetchStudentData = async (students) => {
     const enrichedData = await Promise.all(
       students.map(async (student) => {
         try {
-          const studentDoc = doc(db, `students/${academicYear}/${section}/${student.id}`);
+          const studentDoc = doc(db, `students/${student.id}`);
           const studentSnap = await getDoc(studentDoc);
           if (studentSnap.exists()) {
             const studentData = studentSnap.data();
@@ -88,10 +88,21 @@ const NoDuesPage = () => {
       const q = query(collection(db, collectionPath), orderBy("timestamp", "desc"), limit(1));
       const querySnapshot = await getDocs(q);
 
+      let documentData = null;
+
       if (!querySnapshot.empty) {
-        const latestDoc = querySnapshot.docs[0];
-        const documentData = latestDoc.data();
-        let enrichedData = await fetchStudentData(academicYear, section, documentData.students || []);
+        // Fetch the latest document
+        documentData = querySnapshot.docs[0].data();
+      } else {
+        // Fallback: Fetch any available document
+        const fallbackSnapshot = await getDocs(collection(db, collectionPath));
+        if (!fallbackSnapshot.empty) {
+          documentData = fallbackSnapshot.docs[0].data();
+        }
+      }
+
+      if (documentData && documentData.students) {
+        let enrichedData = await fetchStudentData(documentData.students);
         enrichedData = enrichedData.sort((a, b) => {
           if (sortOrder === "asc") {
             return a.rollNo.localeCompare(b.rollNo);
@@ -217,10 +228,6 @@ const NoDuesPage = () => {
                     Roll No {sortOrder === "asc" ? "↑" : "↓"}
                   </th>
                   <th className="py-4 px-6">Name</th>
-                  <th className="py-4 px-6">Coordinators</th>
-                  <th className="py-4 px-6">Courses</th>
-                  <th className="py-4 px-6">Courses Faculty</th>
-                  <th className="py-4 px-6">Mentors</th>
                   <th className="py-4 px-6">Status</th>
                 </tr>
               </thead>
@@ -234,62 +241,6 @@ const NoDuesPage = () => {
                   >
                     <td className="py-3 px-6">{student.rollNo || "N/A"}</td>
                     <td className="py-3 px-6">{student.name || "N/A"}</td>
-                    <td className="py-3 px-6">
-                      {student.coordinators?.map((coordinator, idx) => (
-                        <p key={idx}>
-                          {getNameById(coordinator.id, facultyMap)} -{" "}
-                          <span
-                            className={`inline-block px-2 py-1 rounded-full ${getStatusColor(
-                              coordinator.status
-                            )}`}
-                          >
-                            {coordinator.status}
-                          </span>
-                        </p>
-                      ))}
-                    </td>
-                    <td className="py-3 px-6">
-                      {student.courses?.map((course, idx) => (
-                        <p key={idx}>
-                          {courseMap[course.id]?.courseName} -{" "}
-                          <span
-                            className={`inline-block px-2 py-1 rounded-full ${getStatusColor(
-                              course.status
-                            )}`}
-                          >
-                            {course.status}
-                          </span>
-                        </p>
-                      ))}
-                    </td>
-                    <td className="py-3 px-6">
-                      {student.courses_faculty?.map((courseFaculty, idx) => (
-                        <p key={idx}>
-                          {facultyMap[courseFaculty.facultyId] || "Unknown Faculty"} -{" "}
-                          <span
-                            className={`inline-block px-2 py-1 rounded-full ${getStatusColor(
-                              courseFaculty.status
-                            )}`}
-                          >
-                            {courseFaculty.status}
-                          </span>
-                        </p>
-                      ))}
-                    </td>
-                    <td className="py-3 px-6">
-                      {student.mentors?.map((mentor, idx) => (
-                        <p key={idx}>
-                          {getNameById(mentor.id, facultyMap)} -{" "}
-                          <span
-                            className={`inline-block px-2 py-1 rounded-full ${getStatusColor(
-                              mentor.status
-                            )}`}
-                          >
-                            {mentor.status}
-                          </span>
-                        </p>
-                      ))}
-                    </td>
                     <td className="py-3 px-6">
                       <span
                         className={`inline-block px-4 py-2 rounded-full text-sm font-semibold ${getStatusColor(
