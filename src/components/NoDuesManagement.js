@@ -225,7 +225,7 @@ const NoDuesPage = () => {
                   <th className="py-4 px-6">Courses</th>
                   <th className="py-4 px-6">Courses Faculty</th>
                   <th className="py-4 px-6">Mentors</th>
-                  <th className="py-4 px-6">Status</th>
+                  {/* <th className="py-4 px-6">Status</th> */}
                 </tr>
               </thead>
               <tbody>
@@ -256,13 +256,13 @@ const NoDuesPage = () => {
                       {student.courses?.map((course, idx) => (
                         <p key={idx}>
                           {courseMap[course.id]?.courseName} -{" "}
-                          <span
+                          {/* <span
                             className={`inline-block px-2 py-1 rounded-full ${getStatusColor(
                               course.status
                             )}`}
                           >
                             {course.status}
-                          </span>
+                          </span> */}
                         </p>
                       ))}
                     </td>
@@ -294,7 +294,7 @@ const NoDuesPage = () => {
                         </p>
                       ))}
                     </td>
-                    <td className="py-3 px-6">
+                    {/* <td className="py-3 px-6">
                       <span
                         className={`inline-block px-4 py-2 rounded-full text-sm font-semibold ${getStatusColor(
                           student.status
@@ -302,7 +302,7 @@ const NoDuesPage = () => {
                       >
                         {student.status || "N/A"}
                       </span>
-                    </td>
+                    </td> */}
                   </tr>
                 ))}
               </tbody>
