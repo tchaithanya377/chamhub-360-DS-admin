@@ -187,7 +187,7 @@ function FacultyAssignments() {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-4xl font-bold text-gray-800 mb-6 text-center">
-          Faculty Assignments
+          Faculty Assigned Courses
         </h1>
 
         {/* Filters Section */}

@@ -44,18 +44,18 @@ const AdminNavbar = () => {
         { name: "Add Course", path: "/addcourse", icon: <FaPlus /> },
       ],
     },
-    {
-      title: "Timetable",
-      links: [
-        { name: "Weekly Timetable", path: "/weeklytimetable", icon: <FaCalendarAlt /> },
-        { name: "Create Timetable", path: "/createtimetable", icon: <FaPlus /> },
-      ],
-    },
+    // {
+    //   title: "Timetable",
+    //   links: [
+    //     { name: "Weekly Timetable", path: "/weeklytimetable", icon: <FaCalendarAlt /> },
+    //     { name: "Create Timetable", path: "/createtimetable", icon: <FaPlus /> },
+    //   ],
+    // },
     {
       title: "Assign",
       links: [
-        { name: "Faculty Assignments", path: "/facultyassignments", icon: <FaTasks /> },
-        { name: "Course Assignment", path: "/relationships", icon: <FaUserTie /> },
+        { name: "Faculty Assigned", path: "/facultyassignments", icon: <FaTasks /> },
+        { name: "Course Assign", path: "/relationships", icon: <FaUserTie /> },
         { name: "Coordinator Assignment", path: "/coordinator", icon: <FaChalkboard /> },
       ],
     },
@@ -76,9 +76,9 @@ const AdminNavbar = () => {
   ];
 
   const otherLinks = [
-    { name: "Dashboard", path: "/dashboard", icon: <FaTachometerAlt /> },
+    // { name: "Dashboard", path: "/dashboard", icon: <FaTachometerAlt /> },
     { name: "Create User", path: "/createuser", icon: <FaUserPlus /> },
-    { name: "Attendance", path: "/attendance", icon: <FaUserCheck /> },
+    // { name: "Attendance", path: "/attendance", icon: <FaUserCheck /> },
   ];
 
   const handleMobileClose = () => {
