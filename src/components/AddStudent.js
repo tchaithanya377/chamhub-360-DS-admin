@@ -177,7 +177,7 @@ const AddStudent = () => {
               Section: section,
               rollNo: row.rollNo.replace(/\s+/g, ""), // Trim spaces
               email: `${row.rollNo.replace(/\s+/g, "")}@mits.ac.in`.toLowerCase(),
-              password: "Rest@1234",
+              password: "Mits@1234",
             });
           }
         });

@@ -6,7 +6,7 @@ import { doc, collection, addDoc } from "firebase/firestore";
 const AddCourse = () => {
   const [excelData, setExcelData] = useState([]);
   const [formData, setFormData] = useState({
-    department: "",
+    department: "Computer Science & Engineering (Data Science)",
     courseName: "",
     courseCode: "",
     instructor: "",
@@ -126,7 +126,7 @@ const AddCourse = () => {
     await addDoc(courseCollection, courseDetails);
     alert("Manual data added successfully!");
     setFormData({
-      department: "",
+      department: "Computer Science & Engineering (Data Science)",
       year: "",
       section: "",
       courseName: "",
