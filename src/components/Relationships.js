@@ -194,7 +194,9 @@ function Relationships() {
               >
                 <option value="">-- Select Faculty --</option>
                 {faculty.map((fac) => (
-                  <option key={fac.id} value={fac.id}>
+                  <option key={fac.userId
+                  } value={fac.userId
+                  }>
                     {fac.name} ({fac.designation})
                   </option>
                 ))}
