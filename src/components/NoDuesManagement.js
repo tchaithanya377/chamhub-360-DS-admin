@@ -11,6 +11,8 @@ const NoDuesPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [sortOrder, setSortOrder] = useState("asc");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
 
   const academicYears = ["I", "II", "III", "IV"];
   const sections = ["A", "B", "C", "D"];
@@ -133,6 +135,14 @@ const NoDuesPage = () => {
     );
   };
 
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+  };
+
+  const handleFilterChange = (e) => {
+    setFilterStatus(e.target.value);
+  };
+
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case "accepted":
@@ -147,6 +157,12 @@ const NoDuesPage = () => {
   };
 
   const getNameById = (id, map) => map[id] || "N/A";
+
+  const filteredData = data.filter((student) => {
+    const matchesSearch = student.rollNo.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = filterStatus ? student.status === filterStatus : true;
+    return matchesSearch && matchesFilter;
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-blue-400 via-purple-500 to-blue-400 flex flex-col items-center py-10">
@@ -211,6 +227,25 @@ const NoDuesPage = () => {
 
         {data.length > 0 && (
           <div className="mt-8 overflow-x-auto">
+            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={handleSearchChange}
+                placeholder="Search by roll number"
+                className="w-full p-3 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              <select
+                value={filterStatus}
+                onChange={handleFilterChange}
+                className="w-full p-3 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="">Filter by status</option>
+                <option value="accepted">Accepted</option>
+                <option value="pending">Pending</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
             <h2 className="text-2xl font-bold text-gray-800 mb-6">
               Data for Academic Year: {academicYear}, Section: {section}
             </h2>
@@ -225,11 +260,10 @@ const NoDuesPage = () => {
                   <th className="py-4 px-6">Courses</th>
                   <th className="py-4 px-6">Courses Faculty</th>
                   <th className="py-4 px-6">Mentors</th>
-                  {/* <th className="py-4 px-6">Status</th> */}
                 </tr>
               </thead>
               <tbody>
-                {data.map((student, index) => (
+                {filteredData.map((student, index) => (
                   <tr
                     key={index}
                     className={`border-b ${
@@ -256,13 +290,6 @@ const NoDuesPage = () => {
                       {student.courses?.map((course, idx) => (
                         <p key={idx}>
                           {courseMap[course.id]?.courseName} -{" "}
-                          {/* <span
-                            className={`inline-block px-2 py-1 rounded-full ${getStatusColor(
-                              course.status
-                            )}`}
-                          >
-                            {course.status}
-                          </span> */}
                         </p>
                       ))}
                     </td>
@@ -294,15 +321,6 @@ const NoDuesPage = () => {
                         </p>
                       ))}
                     </td>
-                    {/* <td className="py-3 px-6">
-                      <span
-                        className={`inline-block px-4 py-2 rounded-full text-sm font-semibold ${getStatusColor(
-                          student.status
-                        )}`}
-                      >
-                        {student.status || "N/A"}
-                      </span>
-                    </td> */}
                   </tr>
                 ))}
               </tbody>

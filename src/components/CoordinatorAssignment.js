@@ -129,6 +129,8 @@ const FacultyManager = () => {
             <option value="NPTL">NPTL</option>
             <option value="Student">Student</option>
             <option value="Internship">Internship</option>
+            <option value="HOD">HOD</option>
+
           </select>
 
           <button

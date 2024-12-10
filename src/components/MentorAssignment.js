@@ -158,8 +158,7 @@ const AssignMentor = () => {
                 Select a faculty member
               </option>
               {facultyData.map((faculty) => (
-                <option key={faculty.userId
-                } value={faculty.userId                }>
+                <option key={faculty.id} value={faculty.id}>
                   {faculty.name} (ID: {faculty.id})
                 </option>
               ))}
