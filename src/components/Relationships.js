@@ -70,61 +70,71 @@ function Relationships() {
       alert("Please select year, section, course, and faculty.");
       return;
     }
-
-    setIsLoading(true); // Start loading
-
+  
+    setIsLoading(true);
+  
     try {
       const selectedCourseDoc = courses.find((course) => course.id === selectedCourse);
-      const assignedFacultyDoc = faculty.find((fac) => fac.id === selectedFaculty);
-
-      if (selectedCourseDoc.instructor) {
-        alert("This course already has a faculty assigned. Please choose another course.");
+      const assignedFacultyDoc = faculty.find((fac) => fac.userId === selectedFaculty); // Match using userId
+  
+      if (!selectedCourseDoc || !assignedFacultyDoc) {
+        alert("Invalid course or faculty selected.");
         setIsLoading(false);
         return;
       }
-
-      // Assign the selected course to students without duplicates
+  
+      if (selectedCourseDoc.instructor) {
+        alert("This course already has a faculty assigned.");
+        setIsLoading(false);
+        return;
+      }
+  
+      const facultyUserId = assignedFacultyDoc.userId; // Ensure userId is used
+  
+      if (!facultyUserId) {
+        alert("Selected faculty does not have a valid userId.");
+        setIsLoading(false);
+        return;
+      }
+  
+      // Update students
       for (const student of students) {
         const studentRef = doc(
           db,
           `students/${selectedYear}/${selectedSection}/${student.id}`
         );
         const updatedCourses = student.courses
-          ? [...new Set([...student.courses, selectedCourse])]
+          ? Array.from(new Set([...student.courses, selectedCourse]))
           : [selectedCourse];
-        await updateDoc(studentRef, {
-          courses: updatedCourses,
-        });
+        await updateDoc(studentRef, { courses: updatedCourses });
       }
-
-      // Assign the selected course to the selected faculty without duplicates
+  
+      // Update faculty
       const facultyRef = doc(db, `faculty/${selectedFaculty}`);
       const updatedFacultyCourses = assignedFacultyDoc.courses
-        ? [...new Set([...assignedFacultyDoc.courses, selectedCourse])]
+        ? Array.from(new Set([...assignedFacultyDoc.courses, selectedCourse]))
         : [selectedCourse];
-      await updateDoc(facultyRef, {
-        courses: updatedFacultyCourses,
-      });
-
-      // Update the course with assigned faculty and students
+      await updateDoc(facultyRef, { courses: updatedFacultyCourses });
+  
+      // Update course
       const courseRef = doc(
         db,
         `courses/Computer Science & Engineering (Data Science)/years/${selectedYear}/sections/${selectedSection}/courseDetails/${selectedCourse}`
       );
       await updateDoc(courseRef, {
-        instructor: selectedFaculty,
+        instructor: facultyUserId, // Link using userId
         students: students.map((student) => student.id),
       });
-
+  
       alert("Relationships successfully assigned!");
     } catch (error) {
-      console.error("Error assigning relationships:", error);
+      console.error("Error assigning relationships:", error.message);
       alert("An error occurred while assigning relationships.");
     }
-
-    setIsLoading(false); // Stop loading
+  
+    setIsLoading(false);
   };
-
+      
   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-4xl mx-auto">
@@ -194,9 +204,7 @@ function Relationships() {
               >
                 <option value="">-- Select Faculty --</option>
                 {faculty.map((fac) => (
-                  <option key={fac.userId
-                  } value={fac.userId
-                  }>
+                  <option key={fac.id} value={fac.id}>
                     {fac.name} ({fac.designation})
                   </option>
                 ))}
