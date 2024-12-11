@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
+import { collection, getDocs, doc, writeBatch } from "firebase/firestore";
 import { db } from "../firebase";
 
 function Relationships() {
@@ -8,9 +8,10 @@ function Relationships() {
   const [courses, setCourses] = useState([]);
   const [selectedYear, setSelectedYear] = useState("");
   const [selectedSection, setSelectedSection] = useState("");
+  const [selectedStudents, setSelectedStudents] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [selectedFaculty, setSelectedFaculty] = useState(null);
-  const [isLoading, setIsLoading] = useState(false); // Loading state
+  const [isLoading, setIsLoading] = useState(false);
 
   // Fetch Data Based on Year and Section
   useEffect(() => {
@@ -20,7 +21,7 @@ function Relationships() {
         return;
       }
 
-      setIsLoading(true); // Start loading
+      setIsLoading(true);
 
       try {
         const normalizedSection = selectedSection.toUpperCase();
@@ -29,10 +30,18 @@ function Relationships() {
         const studentsSnapshot = await getDocs(
           collection(db, `students/${selectedYear}/${normalizedSection}`)
         );
-        const studentsData = studentsSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
+        const studentsData = studentsSnapshot.docs
+          .map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }))
+          .sort((a, b) => {
+            // Sort by rollNo
+            if (a.rollNo && b.rollNo) {
+              return a.rollNo.localeCompare(b.rollNo);
+            }
+            return 0;
+          });
         setStudents(studentsData);
 
         // Fetch faculty
@@ -59,82 +68,84 @@ function Relationships() {
         console.error("Error fetching data:", error);
       }
 
-      setIsLoading(false); // Stop loading
+      setIsLoading(false);
     };
 
     fetchData();
   }, [selectedYear, selectedSection]);
 
+  // Handle selecting or deselecting individual students
+  const handleStudentSelection = (studentId) => {
+    setSelectedStudents((prevSelected) =>
+      prevSelected.includes(studentId)
+        ? prevSelected.filter((id) => id !== studentId) // Deselect if already selected
+        : [...prevSelected, studentId] // Select if not already selected
+    );
+  };
+
+  // Handle "Select All" or "Deselect All"
+  const handleSelectAll = () => {
+    if (selectedStudents.length === students.length) {
+      // If all are selected, deselect all
+      setSelectedStudents([]);
+    } else {
+      // Otherwise, select all
+      setSelectedStudents(students.map((student) => student.id));
+    }
+  };
+
   const assignRelationships = async () => {
-    if (!selectedYear || !selectedSection || !selectedCourse || !selectedFaculty) {
-      alert("Please select year, section, course, and faculty.");
+    if (!selectedYear || !selectedSection || !selectedCourse || !selectedFaculty || selectedStudents.length === 0) {
+      alert("Please select year, section, course, faculty, and at least one student.");
       return;
     }
-  
+
     setIsLoading(true);
-  
+
     try {
-      const selectedCourseDoc = courses.find((course) => course.id === selectedCourse);
-      const assignedFacultyDoc = faculty.find((fac) => fac.userId === selectedFaculty); // Match using userId
-  
-      if (!selectedCourseDoc || !assignedFacultyDoc) {
-        alert("Invalid course or faculty selected.");
-        setIsLoading(false);
-        return;
-      }
-  
-      if (selectedCourseDoc.instructor) {
-        alert("This course already has a faculty assigned.");
-        setIsLoading(false);
-        return;
-      }
-  
-      const facultyUserId = assignedFacultyDoc.userId; // Ensure userId is used
-  
-      if (!facultyUserId) {
-        alert("Selected faculty does not have a valid userId.");
-        setIsLoading(false);
-        return;
-      }
-  
-      // Update students
-      for (const student of students) {
+      const batch = writeBatch(db);
+
+      // Update selected students
+      selectedStudents.forEach((studentId) => {
         const studentRef = doc(
           db,
-          `students/${selectedYear}/${selectedSection}/${student.id}`
+          `students/${selectedYear}/${selectedSection}/${studentId}`
         );
+        const student = students.find((s) => s.id === studentId);
         const updatedCourses = student.courses
-          ? Array.from(new Set([...student.courses, selectedCourse]))
+          ? [...new Set([...student.courses, selectedCourse])]
           : [selectedCourse];
-        await updateDoc(studentRef, { courses: updatedCourses });
-      }
-  
-      // Update faculty
+        batch.update(studentRef, { courses: updatedCourses });
+      });
+
+      // Assign the selected course to the selected faculty
       const facultyRef = doc(db, `faculty/${selectedFaculty}`);
-      const updatedFacultyCourses = assignedFacultyDoc.courses
-        ? Array.from(new Set([...assignedFacultyDoc.courses, selectedCourse]))
+      const facultyDoc = faculty.find((fac) => fac.id === selectedFaculty);
+      const updatedFacultyCourses = facultyDoc.courses
+        ? [...new Set([...facultyDoc.courses, selectedCourse])]
         : [selectedCourse];
-      await updateDoc(facultyRef, { courses: updatedFacultyCourses });
-  
-      // Update course
+      batch.update(facultyRef, { courses: updatedFacultyCourses });
+
+      // Update the course with assigned faculty and selected students
       const courseRef = doc(
         db,
         `courses/Computer Science & Engineering (Data Science)/years/${selectedYear}/sections/${selectedSection}/courseDetails/${selectedCourse}`
       );
-      await updateDoc(courseRef, {
-        instructor: facultyUserId, // Link using userId
-        students: students.map((student) => student.id),
+      batch.update(courseRef, {
+        instructor: selectedFaculty,
+        students: selectedStudents,
       });
-  
+
+      await batch.commit();
       alert("Relationships successfully assigned!");
     } catch (error) {
-      console.error("Error assigning relationships:", error.message);
+      console.error("Error assigning relationships:", error);
       alert("An error occurred while assigning relationships.");
     }
-  
+
     setIsLoading(false);
   };
-      
+
   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-4xl mx-auto">
@@ -176,6 +187,39 @@ function Relationships() {
                 <option value="C">C</option>
               </select>
             </div>
+
+            {students.length > 0 && (
+              <div>
+                <h2 className="text-2xl font-semibold text-gray-700 mb-2">
+                  Select Students
+                </h2>
+                <button
+                  onClick={handleSelectAll}
+                  className="mb-4 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                >
+                  {selectedStudents.length === students.length
+                    ? "Deselect All"
+                    : "Select All"}
+                </button>
+                <div className="space-y-2">
+                  {students.map((student) => (
+                    <div key={student.id} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={student.id}
+                        checked={selectedStudents.includes(student.id)}
+                        onChange={() => handleStudentSelection(student.id)}
+                      />
+                      <label htmlFor={student.id}>
+                        {student.rollNo
+                          ? `${student.rollNo} - ${student.name || `Student ${student.id}`}`
+                          : `Student ID: ${student.id}`}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div>
               <h2 className="text-2xl font-semibold text-gray-700 mb-2">Select Course</h2>
