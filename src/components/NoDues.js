@@ -144,38 +144,51 @@ const NoDuesManagement = () => {
         (mentorId) => selectedMentors[mentorId]
       );
   
-      const linkedStudents = students
-        .map((student) => {
-          if (
-            student.Section?.toLowerCase() !== section.toLowerCase() ||
-            student.Year?.toLowerCase() !== year.toLowerCase()
-          )
-            return null;
+      const linkedStudentsMap = new Map(); // Map to avoid duplicates
   
-          const associatedCourses = student.courses?.filter((courseId) =>
-            selectedCourseIds.includes(courseId)
-          );
+      // Process each selected course
+      for (const courseId of selectedCourseIds) {
+        const course = courses.find((course) => course.id === courseId);
+        const courseStudents = course?.students || []; // Students assigned to this course
   
-          return {
-            id: student.id,
-            name: student.name || "Unknown",
-            courses: associatedCourses?.map((id) => ({ id, status: "Pending" })) || [],
-            courses_faculty: associatedCourses?.map((courseId) => ({
+        // Filter students for this course and add to linkedStudentsMap
+        students
+          .filter((student) => courseStudents.includes(student.id))
+          .forEach((student) => {
+            if (!linkedStudentsMap.has(student.id)) {
+              // If student not already added, initialize their entry
+              linkedStudentsMap.set(student.id, {
+                id: student.id,
+                name: student.name || "Unknown",
+                courses: [],
+                courses_faculty: [],
+                coordinators: selectedCoordinatorIds.map((id) => ({
+                  id,
+                  status: "Pending",
+                })),
+                mentors: selectedMentorIds.includes(student.mentorId)
+                  ? [{ id: student.mentorId, status: "Pending" }]
+                  : [],
+                generatedAt: new Date().toISOString(),
+                status: "Pending",
+              });
+            }
+  
+            // Update the student's courses and faculty data
+            const studentData = linkedStudentsMap.get(student.id);
+            studentData.courses.push({ id: courseId, status: "Pending" });
+            studentData.courses_faculty.push({
               courseId,
-              facultyId: courses.find((course) => course.id === courseId)?.instructor || "Unknown",
+              facultyId: course.instructor || "Unknown",
               status: "Pending",
-            })) || [],
-            coordinators: selectedCoordinatorIds.map((id) => ({ id, status: "Pending" })),
-            mentors: selectedMentorIds.includes(student.mentorId)
-              ? [{ id: student.mentorId, status: "Pending" }]
-              : [],
-            generatedAt: new Date().toISOString(),
-            status: "Pending",
-          };
-        })
-        .filter(Boolean);
+            });
+          });
+      }
   
-      // Use a unique identifier for each document within the section
+      // Convert the linkedStudentsMap to an array
+      const linkedStudents = Array.from(linkedStudentsMap.values());
+  
+      // Save No Dues summary to Firestore
       const noDuesRef = doc(db, `noDues/${year}/${section}/summary`);
       await setDoc(noDuesRef, {
         students: linkedStudents,
@@ -194,7 +207,7 @@ const NoDuesManagement = () => {
       setIsLoading(false);
     }
   };
-  
+    
   const handleCourseSelection = (courseId) => {
     setSelectedCourses((prev) => ({
       ...prev,

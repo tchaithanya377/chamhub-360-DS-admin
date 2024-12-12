@@ -24,6 +24,7 @@ import MentorAssignment from "./components/MentorAssignment";
 import ManageMentors from "./components/ManageMentors";
 import MakeAdmin from "./components/MakeAdmin";
 import UserList from "./components/UserList";
+import NoduesCURD from "./components/NoduesCURD";
 
 // Private Route Wrapper
 const PrivateRoute = ({ children }) => {
@@ -83,6 +84,7 @@ function App() {
                     <Route path="/managementors" element={<ManageMentors />} />
                     <Route path="/make-admin" element={<MakeAdmin />} />
                     <Route path="/list-users" element={<UserList />} />
+                    <Route path="/noduecurd" element={<NoduesCURD />} />
                   </Routes>
                 </div>
               </PrivateRoute>

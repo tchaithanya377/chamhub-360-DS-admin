@@ -105,28 +105,32 @@ function Relationships() {
     try {
       const batch = writeBatch(db);
 
-      // Update selected students
+      // Update only selected students
       selectedStudents.forEach((studentId) => {
         const studentRef = doc(
           db,
           `students/${selectedYear}/${selectedSection}/${studentId}`
         );
         const student = students.find((s) => s.id === studentId);
-        const updatedCourses = student.courses
-          ? [...new Set([...student.courses, selectedCourse])]
-          : [selectedCourse];
-        batch.update(studentRef, { courses: updatedCourses });
+        if (student) {
+          const updatedCourses = student.courses
+            ? [...new Set([...student.courses, selectedCourse])]
+            : [selectedCourse];
+          batch.update(studentRef, { courses: updatedCourses });
+        }
       });
 
-      // Assign the selected course to the selected faculty
+      // Update the faculty with the assigned course
       const facultyRef = doc(db, `faculty/${selectedFaculty}`);
       const facultyDoc = faculty.find((fac) => fac.id === selectedFaculty);
-      const updatedFacultyCourses = facultyDoc.courses
-        ? [...new Set([...facultyDoc.courses, selectedCourse])]
-        : [selectedCourse];
-      batch.update(facultyRef, { courses: updatedFacultyCourses });
+      if (facultyDoc) {
+        const updatedFacultyCourses = facultyDoc.courses
+          ? [...new Set([...facultyDoc.courses, selectedCourse])]
+          : [selectedCourse];
+        batch.update(facultyRef, { courses: updatedFacultyCourses });
+      }
 
-      // Update the course with assigned faculty and selected students
+      // Update the course with the selected students
       const courseRef = doc(
         db,
         `courses/Computer Science & Engineering (Data Science)/years/${selectedYear}/sections/${selectedSection}/courseDetails/${selectedCourse}`
@@ -137,7 +141,7 @@ function Relationships() {
       });
 
       await batch.commit();
-      alert("Relationships successfully assigned!");
+      alert("Relationships successfully assigned for selected students!");
     } catch (error) {
       console.error("Error assigning relationships:", error);
       alert("An error occurred while assigning relationships.");
