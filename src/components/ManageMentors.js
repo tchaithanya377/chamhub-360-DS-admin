@@ -14,6 +14,8 @@ import * as XLSX from "xlsx";
 
 const ManageMentorsAndStudents = () => {
   const [students, setStudents] = useState([]);
+  const [selectedStudents, setSelectedStudents] = useState([]);
+  const [selectAll, setSelectAll] = useState(false);
   const [selectedYear, setSelectedYear] = useState("");
   const [selectedSection, setSelectedSection] = useState("");
   const [loading, setLoading] = useState(false);
@@ -39,6 +41,8 @@ const ManageMentorsAndStudents = () => {
         ...doc.data(),
       }));
       setStudents(studentsData);
+      setSelectedStudents([]); // Reset selection
+      setSelectAll(false);
     } catch (error) {
       console.error("Error fetching students:", error);
       alert("Failed to fetch students.");
@@ -47,64 +51,89 @@ const ManageMentorsAndStudents = () => {
     }
   };
 
-  // Remove mentorId and mentorName for a single student
-  const handleRemoveMentor = async (studentId) => {
+  // Toggle student selection
+  const toggleStudentSelection = (studentId) => {
+    setSelectedStudents((prev) =>
+      prev.includes(studentId)
+        ? prev.filter((id) => id !== studentId)
+        : [...prev, studentId]
+    );
+  };
+
+  // Handle "Select All" toggle
+  const toggleSelectAll = () => {
+    if (selectAll) {
+      setSelectedStudents([]);
+    } else {
+      setSelectedStudents(students.map((student) => student.id));
+    }
+    setSelectAll(!selectAll);
+  };
+
+  // Remove mentors for selected students
+  const handleRemoveMentors = async () => {
+    if (selectedStudents.length === 0) {
+      alert("No students selected.");
+      return;
+    }
+
     const confirmRemove = window.confirm(
-      "Are you sure you want to remove the mentor for this student?"
+      "Are you sure you want to remove mentors for selected students?"
     );
     if (!confirmRemove) return;
 
     try {
-      const studentDocRef = doc(
-        db,
-        `students/${selectedYear}/${selectedSection}`,
-        studentId
-      );
+      for (const studentId of selectedStudents) {
+        const studentDocRef = doc(
+          db,
+          `students/${selectedYear}/${selectedSection}`,
+          studentId
+        );
 
-      // Update the student document to remove mentorId and mentorName
-      await updateDoc(studentDocRef, {
-        mentorId: null,
-        mentorName: null,
-      });
-
-      alert("Mentor removed successfully.");
+        await updateDoc(studentDocRef, {
+          mentorId: null,
+          mentorName: null,
+        });
+      }
+      alert("Mentors removed successfully.");
       fetchStudents(); // Refresh the student list
     } catch (error) {
-      console.error("Error removing mentor:", error);
-      alert("Failed to remove mentor. Please try again.");
+      console.error("Error removing mentors:", error);
+      alert("Failed to remove mentors. Please try again.");
     }
   };
 
   // Export displayed table data to Excel
-  const exportToExcel = () => {
-    const tableData = students.map((student) => ({
-      RollNo: student.rollNo,
-      Name: student.name,
-      Mentor: student.mentorName || "No Mentor",
-    }));
+const exportToExcel = () => {
+  const tableData = students.map((student) => ({
+    RollNo: student.rollNo,
+    Name: student.name,
+    Mentor: student.mentorName || "No Mentor",
+  }));
 
-    const worksheet = XLSX.utils.json_to_sheet(tableData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Students");
-    XLSX.writeFile(workbook, "students_table.xlsx");
-  };
+  const worksheet = XLSX.utils.json_to_sheet(tableData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Students");
+  XLSX.writeFile(workbook, "students_table.xlsx");
+};
 
-  // Export displayed table data to PDF
-  const exportToPDF = () => {
-    const doc = new jsPDF();
-    const tableData = students.map((student) => [
-      student.rollNo,
-      student.name,
-      student.mentorName || "No Mentor",
-    ]);
+// Export displayed table data to PDF
+const exportToPDF = () => {
+  const doc = new jsPDF();
+  const tableData = students.map((student) => [
+    student.rollNo,
+    student.name,
+    student.mentorName || "No Mentor",
+  ]);
 
-    autoTable(doc, {
-      head: [["Roll No", "Name", "Mentor"]],
-      body: tableData,
-    });
+  autoTable(doc, {
+    head: [["Roll No", "Name", "Mentor"]],
+    body: tableData,
+  });
 
-    doc.save("students_table.pdf");
-  };
+  doc.save("students_table.pdf");
+};
+
 
   return (
     <div className="p-8 bg-gray-100 min-h-screen">
@@ -177,15 +206,28 @@ const ManageMentorsAndStudents = () => {
               <table className="w-full table-auto border-collapse border border-gray-300">
                 <thead>
                   <tr className="bg-gray-200">
+                    <th className="border border-gray-300 px-4 py-2">
+                      <input
+                        type="checkbox"
+                        checked={selectAll}
+                        onChange={toggleSelectAll}
+                      />
+                    </th>
                     <th className="border border-gray-300 px-4 py-2">Roll No</th>
                     <th className="border border-gray-300 px-4 py-2">Name</th>
                     <th className="border border-gray-300 px-4 py-2">Mentor</th>
-                    <th className="border border-gray-300 px-4 py-2">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {students.map((student) => (
                     <tr key={student.id}>
+                      <td className="border border-gray-300 px-4 py-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedStudents.includes(student.id)}
+                          onChange={() => toggleStudentSelection(student.id)}
+                        />
+                      </td>
                       <td className="border border-gray-300 px-4 py-2">
                         {student.rollNo}
                       </td>
@@ -195,19 +237,17 @@ const ManageMentorsAndStudents = () => {
                       <td className="border border-gray-300 px-4 py-2">
                         {student.mentorName || "No Mentor"}
                       </td>
-                      <td className="border border-gray-300 px-4 py-2">
-                        <button
-                          className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600 transition"
-                          onClick={() => handleRemoveMentor(student.id)}
-                        >
-                          Remove Mentor
-                        </button>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               <div className="mt-4 flex space-x-4">
+                <button
+                  className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition"
+                  onClick={handleRemoveMentors}
+                >
+                  Remove Mentors for Selected
+                </button>
                 <button
                   className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition"
                   onClick={exportToExcel}
