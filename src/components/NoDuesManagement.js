@@ -158,12 +158,17 @@ const NoDuesPage = () => {
 
   const getNameById = (id, map) => map[id] || "N/A";
 
+
   const filteredData = data.filter((student) => {
-    const matchesSearch = student.rollNo.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterStatus ? student.status === filterStatus : true;
+    const matchesSearch =
+      !searchTerm || student.rollNo.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter =
+      !filterStatus || student.status?.toLowerCase() === filterStatus.toLowerCase();
     return matchesSearch && matchesFilter;
   });
-
+  
+ 
+  
   return (
     <div className="min-h-screen bg-gradient-to-r from-blue-400 via-purple-500 to-blue-400 flex flex-col items-center py-10">
       <div className="bg-white shadow-lg rounded-lg p-8 w-full max-w-7xl">
