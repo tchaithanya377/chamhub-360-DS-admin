@@ -5,6 +5,7 @@ import { db } from "../firebase"; // Your Firebase configuration
 const NoDuesPage = () => {
   const [academicYear, setAcademicYear] = useState("");
   const [section, setSection] = useState("");
+  const [semester, setSemester] = useState("");
   const [data, setData] = useState([]);
   const [facultyMap, setFacultyMap] = useState({});
   const [courseMap, setCourseMap] = useState({});
@@ -15,7 +16,8 @@ const NoDuesPage = () => {
   const [filterStatus, setFilterStatus] = useState("");
 
   const academicYears = ["I", "II", "III", "IV"];
-  const sections = ["A", "B", "C", "D"];
+  const sections = ["A", "B", "C", "D", "E", "F"];
+  const semesters = ["sem1", "sem2"];
 
   // Fetch faculty data
   const fetchFacultyData = async () => {
@@ -32,9 +34,9 @@ const NoDuesPage = () => {
   };
 
   // Fetch course details
-  const fetchCourseData = async (academicYear, section) => {
+  const fetchCourseData = async (academicYear, section, semester) => {
     try {
-      const coursePath = `/courses/Computer Science & Engineering (Data Science)/years/${academicYear}/sections/${section}/courseDetails`;
+      const coursePath = `courses/${academicYear}/${section}/${semester}/courseDetails`;
       const courseSnapshot = await getDocs(collection(db, coursePath));
       const courses = {};
       courseSnapshot.forEach((doc) => {
@@ -75,8 +77,8 @@ const NoDuesPage = () => {
   }, []);
 
   const fetchData = async () => {
-    if (!academicYear || !section) {
-      setError("Please select both academic year and section.");
+    if (!academicYear || !section || !semester) {
+      setError("Please select academic year, section, and semester.");
       return;
     }
 
@@ -84,22 +86,20 @@ const NoDuesPage = () => {
     setError("");
 
     try {
-      await fetchCourseData(academicYear, section);
+      await fetchCourseData(academicYear, section, semester);
 
-      // Query to fetch the latest noDues document
-      const noDuesCollectionRef = collection(db, "noDues", academicYear, section);
-      const latestNoDuesQuery = query(noDuesCollectionRef, orderBy("generatedAt", "desc"), limit(1));
-      const querySnapshot = await getDocs(latestNoDuesQuery);
+      // Query to fetch the noDues document
+      const noDuesDocRef = doc(db, `noDues/${academicYear}/${section}/${semester}`);
+      const noDuesDocSnap = await getDoc(noDuesDocRef);
 
-      if (querySnapshot.empty) {
-        setError("No data found for the selected year and section.");
+      if (!noDuesDocSnap.exists()) {
+        setError("No data found for the selected year, section, and semester.");
         setData([]);
         setIsLoading(false);
         return;
       }
 
-      const latestNoDuesDoc = querySnapshot.docs[0];
-      const documentData = latestNoDuesDoc.data();
+      const documentData = noDuesDocSnap.data();
 
       let enrichedData = await fetchStudentData(academicYear, section, documentData.students || []);
       enrichedData = enrichedData.sort((a, b) => {
@@ -158,7 +158,6 @@ const NoDuesPage = () => {
 
   const getNameById = (id, map) => map[id] || "N/A";
 
-
   const filteredData = data.filter((student) => {
     const matchesSearch =
       !searchTerm || student.rollNo.toLowerCase().includes(searchTerm.toLowerCase());
@@ -166,9 +165,7 @@ const NoDuesPage = () => {
       !filterStatus || student.status?.toLowerCase() === filterStatus.toLowerCase();
     return matchesSearch && matchesFilter;
   });
-  
- 
-  
+
   return (
     <div className="min-h-screen bg-gradient-to-r from-blue-400 via-purple-500 to-blue-400 flex flex-col items-center py-10">
       <div className="bg-white shadow-lg rounded-lg p-8 w-full max-w-7xl">
@@ -208,6 +205,23 @@ const NoDuesPage = () => {
                 {sections.map((sec) => (
                   <option key={sec} value={sec}>
                     {sec}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex-1">
+              <label className="block text-gray-700 font-medium mb-2">
+                Semester:
+              </label>
+              <select
+                value={semester}
+                onChange={(e) => setSemester(e.target.value)}
+                className="w-full p-3 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="">Select Semester</option>
+                {semesters.map((sem) => (
+                  <option key={sem} value={sem}>
+                    {sem}
                   </option>
                 ))}
               </select>
@@ -252,7 +266,7 @@ const NoDuesPage = () => {
               </select>
             </div>
             <h2 className="text-2xl font-bold text-gray-800 mb-6">
-              Data for Academic Year: {academicYear}, Section: {section}
+              Data for Academic Year: {academicYear}, Section: {section}, Semester: {semester}
             </h2>
             <table className="min-w-full bg-white border border-gray-300 shadow-md rounded-lg">
               <thead>
@@ -265,6 +279,7 @@ const NoDuesPage = () => {
                   <th className="py-4 px-6">Courses</th>
                   <th className="py-4 px-6">Courses Faculty</th>
                   <th className="py-4 px-6">Mentors</th>
+                  <th className="py-4 px-6">HOD</th>
                 </tr>
               </thead>
               <tbody>
@@ -325,6 +340,20 @@ const NoDuesPage = () => {
                           </span>
                         </p>
                       ))}
+                    </td>
+                    <td className="py-3 px-6">
+                      {student.hod && (
+                        <p>
+                          {getNameById(student.hod.id, facultyMap)} -{" "}
+                          <span
+                            className={`inline-block px-2 py-1 rounded-full ${getStatusColor(
+                              student.hod.status
+                            )}`}
+                          >
+                            {student.hod.status}
+                          </span>
+                        </p>
+                      )}
                     </td>
                   </tr>
                 ))}

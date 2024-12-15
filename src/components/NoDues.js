@@ -9,6 +9,7 @@ const NoDuesManagement = () => {
   const [filteredCourses, setFilteredCourses] = useState([]);
   const [selectedYear, setSelectedYear] = useState("");
   const [selectedSection, setSelectedSection] = useState("");
+  const [selectedSem, setSelectedSem] = useState("");
   const [selectedCourses, setSelectedCourses] = useState({});
   const [selectedCoordinators, setSelectedCoordinators] = useState({});
   const [selectedMentors, setSelectedMentors] = useState({});
@@ -17,11 +18,15 @@ const NoDuesManagement = () => {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!selectedSem) {
+        console.log("Semester not selected yet.");
+        return;
+      }
+
       setIsLoading(true);
       try {
-        const department = "Computer Science & Engineering (Data Science)";
         const years = ["I", "II", "III", "IV"];
-        const sections = ["A", "B", "C"];
+        const sections = ["A", "B", "C", "D", "E", "F"];
 
         // Fetch courses and students in parallel
         const coursePromises = [];
@@ -29,7 +34,7 @@ const NoDuesManagement = () => {
 
         years.forEach((year) => {
           sections.forEach((section) => {
-            const coursePath = `courses/${department}/years/${year}/sections/${section}/courseDetails`;
+            const coursePath = `courses/${year}/${section}/sem${selectedSem}/courseDetails`;
             coursePromises.push(getDocs(collection(db, coursePath)));
 
             const studentsPath = `students/${year.toUpperCase()}/${section.toUpperCase()}`;
@@ -53,6 +58,7 @@ const NoDuesManagement = () => {
             ...doc.data(),
             year,
             section,
+            sem: selectedSem,
           }));
         });
 
@@ -88,6 +94,20 @@ const NoDuesManagement = () => {
 
         setSelectedCoordinators(defaultCoordinators);
         setSelectedMentors(defaultMentors);
+
+        // Add default HOD as admin if not exists
+        const hodRef = doc(db, "admins", "HOD");
+        const hodSnapshot = await getDocs(collection(db, "admins"));
+        const isHodAdded = hodSnapshot.docs.some((doc) => doc.id === "HOD");
+
+        if (!isHodAdded) {
+          await setDoc(hodRef, {
+            name: "HOD",
+            role: "Admin",
+            createdAt: new Date().toISOString(),
+          });
+          console.log("HOD added as admin.");
+        }
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -96,11 +116,11 @@ const NoDuesManagement = () => {
     };
 
     fetchData();
-  }, []);
+  }, [selectedSem]);
 
   const handleFilter = () => {
-    if (!selectedYear || !selectedSection) {
-      alert("Please select both year and section.");
+    if (!selectedYear || !selectedSection || !selectedSem) {
+      alert("Please select year, section, and semester.");
       return;
     }
 
@@ -109,6 +129,7 @@ const NoDuesManagement = () => {
       (course) =>
         course.year === selectedYear &&
         course.section === selectedSection &&
+        course.sem === selectedSem &&
         course.instructor
     );
     setFilteredCourses(filtered);
@@ -124,14 +145,21 @@ const NoDuesManagement = () => {
     setFilteredMentors(mentorsForSection);
   };
 
-  const handleGenerateNoDues = async (year, section) => {
-    if (!year || !section) {
-      alert("Year and section are required to generate No Dues.");
+  const handleGenerateNoDues = async (year, section, sem) => {
+    if (!year || !section || !sem) {
+      alert("Year, section, and semester are required to generate No Dues.");
       return;
     }
   
     setIsLoading(true);
     try {
+      // Get the HOD
+      const hod = faculty.find((fac) => fac.designation?.trim() === "Asst. Professor & Head");
+      if (!hod) {
+        alert("HOD not found. Please ensure HOD is listed in the faculty.");
+        return;
+      }
+  
       const selectedCourseIds = Object.keys(selectedCourses).filter(
         (courseId) => selectedCourses[courseId]
       );
@@ -144,19 +172,17 @@ const NoDuesManagement = () => {
         (mentorId) => selectedMentors[mentorId]
       );
   
-      const linkedStudentsMap = new Map(); // Map to avoid duplicates
+      const linkedStudentsMap = new Map(); // Map to store student data
   
       // Process each selected course
       for (const courseId of selectedCourseIds) {
         const course = courses.find((course) => course.id === courseId);
-        const courseStudents = course?.students || []; // Students assigned to this course
+        const courseStudents = course?.students || [];
   
-        // Filter students for this course and add to linkedStudentsMap
         students
           .filter((student) => courseStudents.includes(student.id))
           .forEach((student) => {
             if (!linkedStudentsMap.has(student.id)) {
-              // If student not already added, initialize their entry
               linkedStudentsMap.set(student.id, {
                 id: student.id,
                 name: student.name || "Unknown",
@@ -168,13 +194,13 @@ const NoDuesManagement = () => {
                 })),
                 mentors: selectedMentorIds.includes(student.mentorId)
                   ? [{ id: student.mentorId, status: "Pending" }]
-                  : [],
+                  : [], // Include selected mentors
+                hod: { id: hod.id, name: hod.name, status: "Pending" }, // Assign HOD
                 generatedAt: new Date().toISOString(),
                 status: "Pending",
               });
             }
   
-            // Update the student's courses and faculty data
             const studentData = linkedStudentsMap.get(student.id);
             studentData.courses.push({ id: courseId, status: "Pending" });
             studentData.courses_faculty.push({
@@ -185,18 +211,16 @@ const NoDuesManagement = () => {
           });
       }
   
-      // Convert the linkedStudentsMap to an array
+      // Save linked students with HOD, coordinators, and mentors to Firestore
       const linkedStudents = Array.from(linkedStudentsMap.values());
-  
-      // Save No Dues summary to Firestore
-      const noDuesRef = doc(db, `noDues/${year}/${section}/summary`);
+      const noDuesRef = doc(db, `noDues/${year}/${section}/sem${sem}`);
       await setDoc(noDuesRef, {
         students: linkedStudents,
         generatedAt: new Date(),
         status: "Pending",
       });
   
-      alert("No Dues generated successfully!");
+      alert("No Dues generated successfully with Coordinators and Mentors!");
       setSelectedCourses({});
       setSelectedCoordinators({});
       setSelectedMentors({});
@@ -207,29 +231,38 @@ const NoDuesManagement = () => {
       setIsLoading(false);
     }
   };
-    
+  
+  
   const handleCourseSelection = (courseId) => {
     setSelectedCourses((prev) => ({
       ...prev,
       [courseId]: !prev[courseId],
     }));
   };
-  
+
   const handleCoordinatorSelection = (coordinatorId) => {
     setSelectedCoordinators((prev) => ({
       ...prev,
       [coordinatorId]: !prev[coordinatorId],
     }));
   };
-  
+
   const handleMentorSelection = (mentorId) => {
     setSelectedMentors((prev) => ({
       ...prev,
       [mentorId]: !prev[mentorId],
     }));
   };
-  
 
+  // Function to get HOD from faculty list
+  const getHOD = () => {
+    const hod = faculty.find((fac) => fac.designation?.trim() === "Asst. Professor & Head");
+    if (!hod) {
+      console.warn("HOD with designation 'Asst. Professor & Head' not found.");
+      return { name: "N/A", id: "N/A" }; // Return default values if HOD is not found
+    }
+    return hod;
+  };
   
   return (
     <div className="p-6 bg-gray-100 min-h-screen">
@@ -249,7 +282,7 @@ const NoDuesManagement = () => {
               <h2 className="text-xl font-semibold text-gray-700 mb-4">
                 Filter Courses
               </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div>
                   <label className="block font-semibold text-gray-700 mb-1">
                     Select Year
@@ -277,9 +310,26 @@ const NoDuesManagement = () => {
                     className="w-full p-3 border border-gray-300 rounded-md"
                   >
                     <option value="">-- Select Section --</option>
-                    {["A", "B", "C"].map((section) => (
+                    {["A", "B", "C", "D", "E", "F"].map((section) => (
                       <option key={section} value={section}>
                         {section}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-gray-700 mb-1">
+                    Select Semester
+                  </label>
+                  <select
+                    value={selectedSem}
+                    onChange={(e) => setSelectedSem(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-md"
+                  >
+                    <option value="">-- Select Semester --</option>
+                    {["1", "2"].map((sem) => (
+                      <option key={sem} value={sem}>
+                        {sem}
                       </option>
                     ))}
                   </select>
@@ -308,6 +358,7 @@ const NoDuesManagement = () => {
                       <th className="p-3 border border-gray-300">Faculty</th>
                       <th className="p-3 border border-gray-300">Year</th>
                       <th className="p-3 border border-gray-300">Section</th>
+                      <th className="p-3 border border-gray-300">Semester</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -328,6 +379,7 @@ const NoDuesManagement = () => {
                           <td className="p-3 border border-gray-300">{instructor?.name || "N/A"}</td>
                           <td className="p-3 border border-gray-300">{course.year}</td>
                           <td className="p-3 border border-gray-300">{course.section}</td>
+                          <td className="p-3 border border-gray-300">{course.sem}</td>
                         </tr>
                       );
                     })}
@@ -335,7 +387,7 @@ const NoDuesManagement = () => {
                 </table>
               ) : (
                 <p className="text-gray-600 text-center">
-                  No courses found for the selected year and section with an assigned instructor.
+                  No courses found for the selected year, section, and semester with an assigned instructor.
                 </p>
               )}
             </div>
@@ -385,43 +437,73 @@ const NoDuesManagement = () => {
                   </tr>
                 </thead>
                 <tbody>
-                {filteredMentors.length > 0 ? (
-  filteredMentors.map((mentor) => {
-    const assignedStudents = students.filter(
-      (student) =>
-        student.mentorId === mentor.id &&
-        student.Section?.toUpperCase() === selectedSection.toUpperCase() &&
-        student.Year?.toUpperCase() === selectedYear.toUpperCase()
-    ).length;
-    return (
-      <tr key={mentor.id} className="hover:bg-gray-100">
-        <td className="p-3 border border-gray-300 text-center">
-          <input
-            type="checkbox"
-            checked={selectedMentors[mentor.id] || false}
-            onChange={() => handleMentorSelection(mentor.id)}
-          />
-        </td>
-        <td className="p-3 border border-gray-300">{mentor.name}</td>
-        <td className="p-3 border border-gray-300">{assignedStudents}</td>
-      </tr>
-    );
-  })
-) : (
-  <tr>
-    <td colSpan="3" className="text-center p-3 text-gray-600">
-      No mentors found for the selected year and section.
-    </td>
-  </tr>
-)}
+                  {filteredMentors.length > 0 ? (
+                    filteredMentors.map((mentor) => {
+                      const assignedStudents = students.filter(
+                        (student) =>
+                          student.mentorId === mentor.id &&
+                          student.Section?.toUpperCase() === selectedSection.toUpperCase() &&
+                          student.Year?.toUpperCase() === selectedYear.toUpperCase()
+                      ).length;
+                      return (
+                        <tr key={mentor.id} className="hover:bg-gray-100">
+                          <td className="p-3 border border-gray-300 text-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedMentors[mentor.id] || false}
+                              onChange={() => handleMentorSelection(mentor.id)}
+                            />
+                          </td>
+                          <td className="p-3 border border-gray-300">{mentor.name}</td>
+                          <td className="p-3 border border-gray-300">{assignedStudents}</td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan="3" className="text-center p-3 text-gray-600">
+                        No mentors found for the selected year and section.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
+            <div className="bg-white shadow rounded-lg p-6 mt-6">
+  <h2 className="text-xl font-semibold text-gray-700 mb-4">HOD Details</h2>
+  {faculty.length > 0 ? (
+    <table className="w-full border-collapse border border-gray-300">
+      <thead>
+        <tr className="bg-gray-200">
+          <th className="p-3 border border-gray-300 text-center">Select</th>
+          <th className="p-3 border border-gray-300">HOD Name</th>
+          <th className="p-3 border border-gray-300">Designation</th>
+        </tr>
+      </thead>
+      <tbody>
+        {faculty
+          .filter((fac) => fac.designation?.trim() === "Asst. Professor & Head")
+          .map((hod) => (
+            <tr key={hod.id} className="hover:bg-gray-100">
+              <td className="p-3 border border-gray-300 text-center">
+                <input type="checkbox" className="w-5 h-5" checked disabled />
+              </td>
+              <td className="p-3 border border-gray-300">{hod.name}</td>
+              <td className="p-3 border border-gray-300">{hod.designation}</td>
+            </tr>
+          ))}
+      </tbody>
+    </table>
+  ) : (
+    <p className="text-gray-700 text-center">No HOD data available.</p>
+  )}
+</div>
+
 
             {/* Generate No Dues Button */}
             <div className="text-center mt-6">
               <button
-                onClick={() => handleGenerateNoDues(selectedYear, selectedSection)}
+                onClick={() => handleGenerateNoDues(selectedYear, selectedSection, selectedSem)}
                 className="bg-green-500 text-white px-6 py-2 rounded-md hover:bg-green-600 transition"
               >
                 Generate No Dues

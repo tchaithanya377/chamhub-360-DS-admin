@@ -103,7 +103,7 @@ const AddStudent = () => {
       section,
       rollNo: studentData.rollNo.replace(/\s+/g, ""), // Trim spaces from roll number
       email: `${studentData.rollNo.replace(/\s+/g, "")}@mits.ac.in`.toLowerCase(),
-      password: "Rest@1234",
+      password: "Reset@1234",
     };
 
     try {

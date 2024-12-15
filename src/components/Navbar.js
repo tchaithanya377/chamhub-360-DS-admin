@@ -153,7 +153,7 @@ const AdminNavbar = () => {
 
             {/* Logout */}
             <Link
-              to="/logout"
+              to="/"
               className="flex items-center text-sm font-semibold text-red-500"
             >
               <FaSignOutAlt />

@@ -1,38 +1,38 @@
-import React, { useState, useEffect } from 'react';
-import { auth, db } from '../firebase'; // Import Firebase configuration
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import React, { useState, useEffect } from "react";
+import { auth, db } from "../firebase"; // Firebase configuration
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { collection, getDocs, doc, setDoc, updateDoc } from "firebase/firestore";
 
 const CreateUser = () => {
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    role: '',
-    profileLink: '',
+    email: "",
+    password: "",
+    role: "",
+    profileLink: "",
   });
   const [loading, setLoading] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const [facultyList, setFacultyList] = useState([]);
-  const [selectedFaculty, setSelectedFaculty] = useState('');
+  const [selectedFaculty, setSelectedFaculty] = useState("");
 
-  // Fetch faculty list from Firestore
+  // Fetch faculty list when role is set to "Faculty"
   useEffect(() => {
     const fetchFaculty = async () => {
       try {
-        const facultySnapshot = await getDocs(collection(db, 'faculty'));
+        const facultySnapshot = await getDocs(collection(db, "faculty"));
         const facultyData = facultySnapshot.docs.map((doc) => ({
           id: doc.id,
-          ...doc.data(), // Include all document fields
+          ...doc.data(),
         }));
         setFacultyList(facultyData);
       } catch (error) {
-        console.error('Error fetching faculty:', error.message);
-        setErrorMessage('Failed to fetch faculty list. Please try again.');
+        console.error("Error fetching faculty:", error.message);
+        setErrorMessage("Failed to fetch faculty list. Please try again.");
       }
     };
 
-    if (formData.role === 'Faculty') {
+    if (formData.role === "Faculty" || formData.role === "Admin") {
       fetchFaculty();
     }
   }, [formData.role]);
@@ -45,7 +45,7 @@ const CreateUser = () => {
         setFormData((prev) => ({ ...prev, email: selected.emailID }));
       }
     } else {
-      setFormData((prev) => ({ ...prev, email: '' }));
+      setFormData((prev) => ({ ...prev, email: "" }));
     }
   }, [selectedFaculty, facultyList]);
 
@@ -53,55 +53,57 @@ const CreateUser = () => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
 
-    if (name === 'role' && value !== 'Faculty') {
-      setSelectedFaculty('');
-      setFormData((prev) => ({ ...prev, email: '' }));
+    if (name === "role" && value !== "Faculty" && value !== "Admin") {
+      setSelectedFaculty("");
+      setFormData((prev) => ({ ...prev, email: "" }));
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setSuccessMessage('');
-    setErrorMessage('');
+    setSuccessMessage("");
+    setErrorMessage("");
 
     try {
-      // Validate faculty selection if the role is Faculty
-      if (formData.role === 'Faculty' && !selectedFaculty) {
-        throw new Error('Please select a faculty member.');
+      if (!formData.email || !formData.password) {
+        throw new Error("Email and Password are required.");
       }
 
-      // Create user with Firebase Authentication
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        formData.email,
-        formData.password
-      );
+      // Validate faculty selection for Faculty or Admin roles
+      if ((formData.role === "Faculty" || formData.role === "Admin") && !selectedFaculty) {
+        throw new Error("Please select a faculty member.");
+      }
+
+      // Create user in Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
       const userId = userCredential.user.uid;
 
-      if (formData.role === 'Faculty') {
-        // Fetch existing faculty data
-        const selectedFacultyData = facultyList.find(
-          (faculty) => faculty.id === selectedFaculty
-        );
-
-        if (!selectedFacultyData) {
-          throw new Error('Selected faculty not found in the database.');
-        }
-
-        // Delete the old faculty document
-        await deleteDoc(doc(db, 'faculty', selectedFaculty));
-
-        // Create a new faculty document with UID as the document ID
-        const facultyRef = doc(db, 'faculty', userId); // Use UID as document ID
-        await setDoc(facultyRef, {
-          ...selectedFacultyData, // Copy the existing faculty details
-          userId, // Add UID to the faculty document
+      if (formData.role === "Faculty") {
+        // Update Faculty Document
+        const facultyRef = doc(db, "faculty", selectedFaculty);
+        await updateDoc(facultyRef, {
+          userId, // Link UID
+          role: "Faculty",
         });
 
-        setSuccessMessage(`Faculty user created and linked successfully!`);
+        setSuccessMessage("Faculty user created and linked successfully!");
+      } else if (formData.role === "Admin") {
+        // Fetch faculty data to promote to Admin
+        const selectedFacultyData = facultyList.find((faculty) => faculty.id === selectedFaculty);
+        if (!selectedFacultyData) throw new Error("Selected faculty not found.");
+
+        // Save Admin data in a new collection
+        const adminRef = doc(db, "admins", userId);
+        await setDoc(adminRef, {
+          ...selectedFacultyData,
+          role: "Admin",
+          userId,
+        });
+
+        setSuccessMessage("Admin user created successfully and linked to faculty!");
       } else {
-        // Save non-faculty user data to Firestore
+        // For other roles (e.g., Students)
         const userData = {
           role: formData.role,
           email: formData.email,
@@ -109,22 +111,21 @@ const CreateUser = () => {
           createdAt: new Date(),
         };
 
-        await setDoc(doc(db, 'users', userId), userData);
-
-        setSuccessMessage('User account created successfully!');
+        await setDoc(doc(db, "users", userId), userData);
+        setSuccessMessage("User account created successfully!");
       }
 
-      // Reset the form
+      // Reset form
       setFormData({
-        email: '',
-        password: '',
-        role: '',
-        profileLink: '',
+        email: "",
+        password: "",
+        role: "",
+        profileLink: "",
       });
-      setSelectedFaculty('');
+      setSelectedFaculty("");
     } catch (error) {
-      console.error('Error creating user:', error.message);
-      setErrorMessage(error.message || 'Failed to create user. Please try again.');
+      console.error("Error creating user:", error.message);
+      setErrorMessage(error.message || "Failed to create user. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -151,7 +152,7 @@ const CreateUser = () => {
           <option value="Admin">Admin</option>
         </select>
 
-        {formData.role === 'Faculty' && (
+        {(formData.role === "Faculty" || formData.role === "Admin") && (
           <select
             value={selectedFaculty}
             onChange={(e) => setSelectedFaculty(e.target.value)}
@@ -172,7 +173,7 @@ const CreateUser = () => {
           name="email"
           value={formData.email}
           placeholder="Email"
-          readOnly={formData.role === 'Faculty'}
+          readOnly={formData.role === "Faculty" || formData.role === "Admin"}
           onChange={handleInputChange}
           className="border p-2 rounded w-full"
           required
@@ -188,7 +189,7 @@ const CreateUser = () => {
           className="border p-2 rounded w-full"
         />
 
-        {formData.role !== 'Faculty' && (
+        {formData.role === "Student" && (
           <input
             type="text"
             name="profileLink"
@@ -202,11 +203,11 @@ const CreateUser = () => {
         <button
           type="submit"
           className={`px-4 py-2 rounded text-white ${
-            loading ? 'bg-gray-500' : 'bg-blue-500 hover:bg-blue-600'
+            loading ? "bg-gray-500" : "bg-blue-500 hover:bg-blue-600"
           }`}
           disabled={loading}
         >
-          {loading ? 'Creating...' : 'Create User'}
+          {loading ? "Creating..." : "Create User"}
         </button>
       </form>
     </div>
@@ -214,3 +215,4 @@ const CreateUser = () => {
 };
 
 export default CreateUser;
+  

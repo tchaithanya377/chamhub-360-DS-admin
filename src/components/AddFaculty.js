@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { db } from "../firebase"; // Adjust the path to your Firebase config
-import { collection, addDoc, query, where, getDocs } from "firebase/firestore";
+import { collection, addDoc, query, where, getDocs, setDoc, doc } from "firebase/firestore";
+import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import * as XLSX from "xlsx";
 
 const AddFaculty = () => {
@@ -15,6 +16,7 @@ const AddFaculty = () => {
     pan: "",
     aadhaar: "",
     emailID: "",
+    password: "", // Added for Authentication
     dob: "",
     empID: "",
     experience: "",
@@ -46,6 +48,12 @@ const AddFaculty = () => {
 
   const [facultyData, setFacultyData] = useState(initialFields);
   const [excelData, setExcelData] = useState([]);
+  const [uploadStatus, setUploadStatus] = useState("");
+
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -54,35 +62,55 @@ const AddFaculty = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!facultyData.empID) {
-      alert("Emp ID is required.");
+    const { emailID, empID } = facultyData;
+  
+    if (!emailID || !empID) {
+      alert("Emp ID and Email ID are required.");
       return;
     }
-
+  
+    if (!validateEmail(emailID)) {
+      alert("Please enter a valid Email ID.");
+      return;
+    }
+  
+    const auth = getAuth();
+    const defaultPassword = "Mits@1234"; // Default password
+  
     try {
+      // Add to Firebase Authentication with default password
+      const userCredential = await createUserWithEmailAndPassword(auth, emailID, defaultPassword);
+      const userId = userCredential.user.uid;
+  
+      // Check for duplicate empID
       const facultyCollection = collection(db, "faculty");
-      const q = query(facultyCollection, where("empID", "==", facultyData.empID));
+      const q = query(facultyCollection, where("empID", "==", empID));
       const querySnapshot = await getDocs(q);
-
+  
       if (!querySnapshot.empty) {
         alert("Faculty Emp ID already exists.");
         return;
       }
-
-      await addDoc(facultyCollection, facultyData);
-      alert("Faculty added successfully!");
+  
+      // Add to Firestore
+      await setDoc(doc(facultyCollection, emailID), {
+        ...facultyData,
+        password: defaultPassword, // Save default password for reference
+        uid: userId, // Save Auth UID
+      });
+  
+      alert("Faculty added successfully with default password!");
       setFacultyData(initialFields);
     } catch (error) {
       console.error("Error adding faculty:", error.message);
-      alert("Failed to add faculty. Please try again.");
+      alert(`Failed to add faculty: ${error.message}`);
     }
   };
-
+  
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) {
-      alert('Please upload a valid Excel file.');
+      alert("Please upload a valid Excel file.");
       return;
     }
 
@@ -90,153 +118,96 @@ const AddFaculty = () => {
     reader.onload = (event) => {
       try {
         const data = new Uint8Array(event.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
+        const workbook = XLSX.read(data, { type: "array" });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, {
           raw: false,
-          defval: '',
-          header: [
-            'sno',
-            'name',
-            'designation',
-            'dateOfJoining',
-            'qualifications',
-            'contactNo',
-            'areaOfSpecialization',
-            'pan',
-            'aadhaar',
-            'emailID',
-            'dob',
-            'empID',
-            'experience',
-            'acadExperience',
-            'industryExperience',
-            'promotionDate',
-            'specialization',
-            'degr',
-            'degrDate',
-            'depRole',
-            'state',
-            'religion',
-            'caste',
-            'subCaste',
-            'bloodGroup',
-            'origin',
-            'localAddress',
-            'permAddress',
-            'bankName',
-            'bankAccountNumber',
-            'branch',
-            'ifsc',
-            'bankAddr',
-            'spouseName',
-            'relationshipWithSpouse',
-            'fatherName',
-            'motherName'
-          ]
+          defval: "",
+          header: Object.keys(initialFields),
         });
 
-        // Remove header row if present
-        const processedData = jsonData.filter(row => {
-          // Check if row has actual data
-          return Object.values(row).some(value => value !== '');
-        });
+        const processedData = jsonData.filter((row) =>
+          Object.values(row).some((value) => value !== "")
+        );
 
         if (processedData.length === 0) {
-          alert('No valid data found in the Excel file.');
+          alert("No valid data found in the Excel file.");
           return;
         }
-
-        // Log the first row to check the data structure
-        console.log('Sample row:', processedData[0]);
 
         setExcelData(processedData);
         alert(`Excel file processed successfully! Found ${processedData.length} valid entries.`);
       } catch (error) {
-        console.error('Error processing Excel file:', error);
-        alert('Failed to process the Excel file. Please check the format.');
+        console.error("Error processing Excel file:", error);
+        alert("Failed to process the Excel file. Please check the format.");
       }
     };
 
     reader.onerror = (error) => {
-      console.error('Error reading Excel file:', error);
-      alert('Failed to read the Excel file.');
+      console.error("Error reading Excel file:", error);
+      alert("Failed to read the Excel file.");
     };
 
     reader.readAsArrayBuffer(file);
   };
 
   const handleUpload = async () => {
+    const auth = getAuth();
+    const facultyCollection = collection(db, "faculty");
+    const defaultPassword = "Mits@1234"; // Default password for bulk upload
+    let successCount = 0;
+    let skipCount = 0;
+  
     try {
-      const facultyCollection = collection(db, 'faculty');
-      let successCount = 0;
-      let skipCount = 0;
-
       for (const faculty of excelData) {
-        // Skip empty rows or rows without empID
-        if (!faculty.empID || faculty.empID.trim() === '') {
-          console.log('Skipping entry due to missing empID:', faculty);
+        const { empID, emailID } = faculty;
+  
+        if (!emailID || !validateEmail(emailID) || !empID) {
+          console.log("Skipping entry due to missing/invalid fields:", faculty);
           skipCount++;
           continue;
         }
-
-        // Check if faculty already exists
-        const q = query(facultyCollection, where('empID', '==', faculty.empID));
-        const querySnapshot = await getDocs(q);
-
-        if (querySnapshot.empty) {
-          // Clean the data before uploading
-          const cleanedFaculty = {
-            empID: faculty.empID.trim(),
-            name: faculty.name?.trim() || '',
-            designation: faculty.designation?.trim() || '',
-            dateOfJoining: faculty.dateOfJoining?.trim() || '',
-            qualifications: faculty.qualifications?.trim() || '',
-            contactNo: faculty.contactNo?.trim() || '',
-            areaOfSpecialization: faculty.areaOfSpecialization?.trim() || '',
-            pan: faculty.pan?.trim() || '',
-            aadhaar: faculty.aadhaar?.trim() || '',
-            emailID: faculty.emailID?.trim() || '',
-            dob: faculty.dob?.trim() || '',
-            experience: faculty.experience?.trim() || '',
-            acadExperience: faculty.acadExperience?.trim() || '',
-            industryExperience: faculty.industryExperience?.trim() || '',
-            promotionDate: faculty.promotionDate?.trim() || '',
-            specialization: faculty.specialization?.trim() || '',
-            degr: faculty.degr?.trim() || '',
-            degrDate: faculty.degrDate?.trim() || '',
-            depRole: faculty.depRole?.trim() || '',
-            state: faculty.state?.trim() || '',
-            religion: faculty.religion?.trim() || '',
-            caste: faculty.caste?.trim() || '',
-            subCaste: faculty.subCaste?.trim() || '',
-            bloodGroup: faculty.bloodGroup?.trim() || '',
-            origin: faculty.origin?.trim() || '',
-            localAddress: faculty.localAddress?.trim() || '',
-            permAddress: faculty.permAddress?.trim() || '',
-            bankName: faculty.bankName?.trim() || '',
-            bankAccountNumber: faculty.bankAccountNumber?.trim() || '',
-            branch: faculty.branch?.trim() || '',
-            ifsc: faculty.ifsc?.trim() || '',
-            bankAddr: faculty.bankAddr?.trim() || '',
-            spouseName: faculty.spouseName?.trim() || '',
-            relationshipWithSpouse: faculty.relationshipWithSpouse?.trim() || '',
-            fatherName: faculty.fatherName?.trim() || '',
-            motherName: faculty.motherName?.trim() || ''
-          };
-
-          await addDoc(facultyCollection, cleanedFaculty);
+  
+        try {
+          // Add to Firebase Authentication with default password
+          const userCredential = await createUserWithEmailAndPassword(auth, emailID, defaultPassword);
+          const userId = userCredential.user.uid;
+  
+          // Check for duplicate empID
+          const q = query(facultyCollection, where("empID", "==", empID.trim()));
+          const querySnapshot = await getDocs(q);
+  
+          if (!querySnapshot.empty) {
+            console.log(`Faculty with Emp ID ${empID} already exists.`);
+            skipCount++;
+            continue;
+          }
+  
+          // Add to Firestore
+          await addDoc(facultyCollection, {
+            ...faculty,
+            password: defaultPassword, // Save default password for reference
+            uid: userId,
+          });
+  
           successCount++;
+          setUploadStatus(`Uploading... ${successCount} added, ${skipCount} skipped.`);
+        } catch (authError) {
+          console.error("Failed to add to Authentication:", authError.message);
+          skipCount++;
         }
       }
-
+  
       alert(`Upload complete!\nSuccessfully added: ${successCount}\nSkipped entries: ${skipCount}`);
       setExcelData([]);
+      setUploadStatus("");
     } catch (error) {
-      console.error('Error uploading faculty data:', error);
-      alert('Failed to upload faculty data. Please try again.');
+      console.error("Error uploading faculty data:", error);
+      alert("Failed to upload faculty data. Please try again.");
+      setUploadStatus("");
     }
   };
+  
 
   return (
     <div className="p-6">
@@ -255,7 +226,7 @@ const AddFaculty = () => {
                 value={facultyData[field]}
                 onChange={handleChange}
                 className="mt-1 block w-full p-2 border border-gray-300 rounded-lg"
-                required={field === "empID"}
+                required={["empID", "emailID", "password"].includes(field)}
               />
             </div>
           ))}
@@ -285,6 +256,7 @@ const AddFaculty = () => {
         >
           Upload Bulk Data
         </button>
+        {uploadStatus && <p className="mt-4 text-sm text-gray-700">{uploadStatus}</p>}
       </div>
     </div>
   );

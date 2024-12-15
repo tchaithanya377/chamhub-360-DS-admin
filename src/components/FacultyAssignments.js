@@ -8,6 +8,7 @@ function FacultyAssignments() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedYear, setSelectedYear] = useState("");
   const [selectedSection, setSelectedSection] = useState("");
+  const [selectedSemester, setSelectedSemester] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -24,36 +25,40 @@ function FacultyAssignments() {
 
         const assignments = [];
         const years = ["I", "II", "III", "IV"];
-        const sections = ["A", "B", "C"];
+        const sections = ["A", "B", "C", "D", "E", "F"];
+        const semesters = ["sem1", "sem2"];
 
         for (const year of years) {
           for (const section of sections) {
-            for (const faculty of facultyList) {
-              const assignedCourses = faculty.courses || [];
-              for (const courseId of assignedCourses) {
-                try {
-                  const courseDoc = await getDoc(
-                    doc(
-                      db,
-                      `courses/Computer Science & Engineering (Data Science)/years/${year}/sections/${section}/courseDetails/${courseId}`
-                    )
-                  );
+            for (const semester of semesters) {
+              for (const faculty of facultyList) {
+                const assignedCourses = faculty.courses || [];
+                for (const courseId of assignedCourses) {
+                  try {
+                    const courseDoc = await getDoc(
+                      doc(
+                        db,
+                        `courses/${year}/${section}/${semester}/courseDetails/${courseId}`
+                      )
+                    );
 
-                  if (courseDoc.exists()) {
-                    const courseData = courseDoc.data();
-                    assignments.push({
-                      id: courseId, // Unique ID
-                      facultyId: faculty.id,
-                      facultyName: faculty.name,
-                      facultyDesignation: faculty.designation,
-                      year,
-                      section,
-                      courseCode: courseData.courseCode,
-                      courseName: courseData.courseName,
-                    });
+                    if (courseDoc.exists()) {
+                      const courseData = courseDoc.data();
+                      assignments.push({
+                        id: courseId, // Unique ID
+                        facultyId: faculty.id,
+                        facultyName: faculty.name,
+                        facultyDesignation: faculty.designation,
+                        year,
+                        section,
+                        semester,
+                        courseCode: courseData.courseCode,
+                        courseName: courseData.courseName,
+                      });
+                    }
+                  } catch (err) {
+                    console.warn(`Error fetching course: ${courseId} for year ${year}, section ${section}, semester ${semester}`, err);
                   }
-                } catch (err) {
-                  console.warn(`Error fetching course: ${courseId} for year ${year}, section ${section}`, err);
                 }
               }
             }
@@ -75,29 +80,36 @@ function FacultyAssignments() {
   const handleSearch = (e) => {
     const term = e.target.value.toLowerCase();
     setSearchTerm(term);
-    filterAssignments(term, selectedYear, selectedSection);
+    filterAssignments(term, selectedYear, selectedSection, selectedSemester);
   };
 
   const handleYearFilter = (e) => {
     const year = e.target.value;
     setSelectedYear(year);
-    filterAssignments(searchTerm, year, selectedSection);
+    filterAssignments(searchTerm, year, selectedSection, selectedSemester);
   };
 
   const handleSectionFilter = (e) => {
     const section = e.target.value;
     setSelectedSection(section);
-    filterAssignments(searchTerm, selectedYear, section);
+    filterAssignments(searchTerm, selectedYear, section, selectedSemester);
   };
 
-  const filterAssignments = (term, year, section) => {
+  const handleSemesterFilter = (e) => {
+    const semester = e.target.value;
+    setSelectedSemester(semester);
+    filterAssignments(searchTerm, selectedYear, selectedSection, semester);
+  };
+
+  const filterAssignments = (term, year, section, semester) => {
     const filtered = facultyAssignments.filter((assignment) => {
       const matchesSearch =
         assignment.facultyName.toLowerCase().includes(term) ||
         assignment.facultyDesignation.toLowerCase().includes(term);
       const matchesYear = year ? assignment.year === year : true;
       const matchesSection = section ? assignment.section === section : true;
-      return matchesSearch && matchesYear && matchesSection;
+      const matchesSemester = semester ? assignment.semester === semester : true;
+      return matchesSearch && matchesYear && matchesSection && matchesSemester;
     });
     setFilteredAssignments(filtered);
   };
@@ -141,7 +153,7 @@ function FacultyAssignments() {
         // Step 3: Reset the instructor and students relationship in the course document
         const courseRef = doc(
           db,
-          `courses/Computer Science & Engineering (Data Science)/years/${assignment.year}/sections/${assignment.section}/courseDetails/${assignment.id}`
+          `courses/${assignment.year}/${assignment.section}/${assignment.semester}/courseDetails/${assignment.id}`
         );
         await updateDoc(courseRef, {
           instructor: null, // Remove the instructor
@@ -164,7 +176,7 @@ function FacultyAssignments() {
       if (selectedAssignment) {
         const courseRef = doc(
           db,
-          `courses/Computer Science & Engineering (Data Science)/years/${selectedAssignment.year}/sections/${selectedAssignment.section}/courseDetails/${selectedAssignment.id}`
+          `courses/${selectedAssignment.year}/${selectedAssignment.section}/${selectedAssignment.semester}/courseDetails/${selectedAssignment.id}`
         );
         await updateDoc(courseRef, {
           courseName: selectedAssignment.courseName,
@@ -197,7 +209,7 @@ function FacultyAssignments() {
             value={searchTerm}
             onChange={handleSearch}
             placeholder="Search by faculty name or designation"
-            className="w-full md:w-1/3 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full md:w-1/4 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
 
           <select
@@ -221,6 +233,19 @@ function FacultyAssignments() {
             <option value="A">A</option>
             <option value="B">B</option>
             <option value="C">C</option>
+            <option value="D">D</option>
+            <option value="E">E</option>
+            <option value="F">F</option>
+          </select>
+
+          <select
+            value={selectedSemester}
+            onChange={handleSemesterFilter}
+            className="w-full md:w-1/4 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mt-4 md:mt-0"
+          >
+            <option value="">All Semesters</option>
+            <option value="sem1">Semester 1</option>
+            <option value="sem2">Semester 2</option>
           </select>
         </div>
 
@@ -243,6 +268,9 @@ function FacultyAssignments() {
                 </p>
                 <p className="text-gray-600">
                   <strong>Section:</strong> {assignment.section}
+                </p>
+                <p className="text-gray-600">
+                  <strong>Semester:</strong> {assignment.semester === "sem1" ? "Semester 1" : "Semester 2"}
                 </p>
                 <p className="text-gray-600">
                   <strong>Course Code:</strong> {assignment.courseCode}

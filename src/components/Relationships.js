@@ -8,16 +8,17 @@ function Relationships() {
   const [courses, setCourses] = useState([]);
   const [selectedYear, setSelectedYear] = useState("");
   const [selectedSection, setSelectedSection] = useState("");
+  const [selectedSem, setSelectedSem] = useState("");
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [selectedFaculty, setSelectedFaculty] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch Data Based on Year and Section
+  // Fetch Data Based on Year, Section, and Semester
   useEffect(() => {
     const fetchData = async () => {
-      if (!selectedYear || !selectedSection) {
-        console.log("Year or Section not selected yet.");
+      if (!selectedYear || !selectedSection || !selectedSem) {
+        console.log("Year, Section, or Semester not selected yet.");
         return;
       }
 
@@ -56,7 +57,7 @@ function Relationships() {
         const coursesSnapshot = await getDocs(
           collection(
             db,
-            `courses/Computer Science & Engineering (Data Science)/years/${selectedYear}/sections/${normalizedSection}/courseDetails`
+            `courses/${selectedYear}/${normalizedSection}/sem${selectedSem}/courseDetails`
           )
         );
         const coursesData = coursesSnapshot.docs.map((doc) => ({
@@ -72,7 +73,7 @@ function Relationships() {
     };
 
     fetchData();
-  }, [selectedYear, selectedSection]);
+  }, [selectedYear, selectedSection, selectedSem]);
 
   // Handle selecting or deselecting individual students
   const handleStudentSelection = (studentId) => {
@@ -95,8 +96,8 @@ function Relationships() {
   };
 
   const assignRelationships = async () => {
-    if (!selectedYear || !selectedSection || !selectedCourse || !selectedFaculty || selectedStudents.length === 0) {
-      alert("Please select year, section, course, faculty, and at least one student.");
+    if (!selectedYear || !selectedSection || !selectedSem || !selectedCourse || !selectedFaculty || selectedStudents.length === 0) {
+      alert("Please select year, section, semester, course, faculty, and at least one student.");
       return;
     }
 
@@ -133,7 +134,7 @@ function Relationships() {
       // Update the course with the selected students
       const courseRef = doc(
         db,
-        `courses/Computer Science & Engineering (Data Science)/years/${selectedYear}/sections/${selectedSection}/courseDetails/${selectedCourse}`
+        `courses/${selectedYear}/${selectedSection}/sem${selectedSem}/courseDetails/${selectedCourse}`
       );
       batch.update(courseRef, {
         instructor: selectedFaculty,
@@ -189,6 +190,22 @@ function Relationships() {
                 <option value="A">A</option>
                 <option value="B">B</option>
                 <option value="C">C</option>
+                <option value="D">D</option>
+                <option value="E">E</option>
+                <option value="F">F</option>
+              </select>
+            </div>
+
+            <div>
+              <h2 className="text-2xl font-semibold text-gray-700 mb-2">Select Semester</h2>
+              <select
+                value={selectedSem}
+                onChange={(e) => setSelectedSem(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-md"
+              >
+                <option value="">-- Select a Semester --</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
               </select>
             </div>
 
