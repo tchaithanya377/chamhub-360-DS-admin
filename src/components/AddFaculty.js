@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { db } from "../firebase"; // Adjust the path to your Firebase config
-import { collection, addDoc, query, where, getDocs, setDoc, doc } from "firebase/firestore";
+import { collection, query, where, getDocs, setDoc, doc } from "firebase/firestore";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import * as XLSX from "xlsx";
 
@@ -16,7 +16,7 @@ const AddFaculty = () => {
     pan: "",
     aadhaar: "",
     emailID: "",
-    password: "", // Added for Authentication
+    password: "", // For Authentication
     dob: "",
     empID: "",
     experience: "",
@@ -49,175 +49,122 @@ const AddFaculty = () => {
   const [facultyData, setFacultyData] = useState(initialFields);
   const [excelData, setExcelData] = useState([]);
   const [uploadStatus, setUploadStatus] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const validateEmail = (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
+  const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFacultyData((prevData) => ({ ...prevData, [name]: value }));
+    setFacultyData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const { emailID, empID } = facultyData;
-  
-    if (!emailID || !empID) {
-      alert("Emp ID and Email ID are required.");
-      return;
-    }
-  
-    if (!validateEmail(emailID)) {
-      alert("Please enter a valid Email ID.");
-      return;
-    }
-  
+    if (!emailID || !empID) return alert("Emp ID and Email ID are required.");
+    if (!validateEmail(emailID)) return alert("Please enter a valid Email ID.");
+
     const auth = getAuth();
-    const defaultPassword = "Mits@1234"; // Default password
-  
+    const defaultPassword = "Mits@1234";
     try {
-      // Add to Firebase Authentication with default password
+      setLoading(true);
       const userCredential = await createUserWithEmailAndPassword(auth, emailID, defaultPassword);
       const userId = userCredential.user.uid;
-  
-      // Check for duplicate empID
-      const facultyCollection = collection(db, "faculty");
-      const q = query(facultyCollection, where("empID", "==", empID));
-      const querySnapshot = await getDocs(q);
-  
-      if (!querySnapshot.empty) {
-        alert("Faculty Emp ID already exists.");
-        return;
-      }
-  
-      // Add to Firestore
-      await setDoc(doc(facultyCollection, emailID), {
+
+      const q = query(collection(db, "faculty"), where("empID", "==", empID));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) return alert("Faculty Emp ID already exists.");
+
+      await setDoc(doc(db, "faculty", userId), {
         ...facultyData,
-        password: defaultPassword, // Save default password for reference
-        uid: userId, // Save Auth UID
+        uid: userId,
+        password: defaultPassword, 
       });
-  
-      alert("Faculty added successfully with default password!");
+
+      setUploadStatus("Faculty added successfully!");
       setFacultyData(initialFields);
     } catch (error) {
-      console.error("Error adding faculty:", error.message);
-      alert(`Failed to add faculty: ${error.message}`);
+      console.error("Error adding faculty:", error);
+      setUploadStatus(`Failed: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
   };
-  
+
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
-    if (!file) {
-      alert("Please upload a valid Excel file.");
-      return;
-    }
+    if (!file) return alert("Please upload a valid Excel file.");
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      try {
-        const data = new Uint8Array(event.target.result);
-        const workbook = XLSX.read(data, { type: "array" });
-        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, {
-          raw: false,
-          defval: "",
-          header: Object.keys(initialFields),
-        });
+      const data = new Uint8Array(event.target.result);
+      const workbook = XLSX.read(data, { type: "array" });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+        raw: false,
+        defval: "",
+        header: Object.keys(initialFields),
+      }).filter((row) => Object.values(row).some((value) => value !== ""));
 
-        const processedData = jsonData.filter((row) =>
-          Object.values(row).some((value) => value !== "")
-        );
-
-        if (processedData.length === 0) {
-          alert("No valid data found in the Excel file.");
-          return;
-        }
-
-        setExcelData(processedData);
-        alert(`Excel file processed successfully! Found ${processedData.length} valid entries.`);
-      } catch (error) {
-        console.error("Error processing Excel file:", error);
-        alert("Failed to process the Excel file. Please check the format.");
-      }
+      if (jsonData.length === 0) return alert("No valid data found in the Excel file.");
+      setExcelData(jsonData);
+      setUploadStatus(`Excel file processed. ${jsonData.length} entries found.`);
     };
-
-    reader.onerror = (error) => {
-      console.error("Error reading Excel file:", error);
-      alert("Failed to read the Excel file.");
-    };
-
     reader.readAsArrayBuffer(file);
   };
 
   const handleUpload = async () => {
     const auth = getAuth();
-    const facultyCollection = collection(db, "faculty");
-    const defaultPassword = "Mits@1234"; // Default password for bulk upload
+    const defaultPassword = "Mits@1234";
     let successCount = 0;
     let skipCount = 0;
-  
-    try {
-      for (const faculty of excelData) {
-        const { empID, emailID } = faculty;
-  
-        if (!emailID || !validateEmail(emailID) || !empID) {
-          console.log("Skipping entry due to missing/invalid fields:", faculty);
+    setLoading(true);
+
+    for (const faculty of excelData) {
+      const { empID, emailID } = faculty;
+      if (!emailID || !validateEmail(emailID) || !empID) {
+        skipCount++;
+        continue;
+      }
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, emailID, defaultPassword);
+        const userId = userCredential.user.uid;
+
+        const q = query(collection(db, "faculty"), where("empID", "==", empID));
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
           skipCount++;
           continue;
         }
-  
-        try {
-          // Add to Firebase Authentication with default password
-          const userCredential = await createUserWithEmailAndPassword(auth, emailID, defaultPassword);
-          const userId = userCredential.user.uid;
-  
-          // Check for duplicate empID
-          const q = query(facultyCollection, where("empID", "==", empID.trim()));
-          const querySnapshot = await getDocs(q);
-  
-          if (!querySnapshot.empty) {
-            console.log(`Faculty with Emp ID ${empID} already exists.`);
-            skipCount++;
-            continue;
-          }
-  
-          // Add to Firestore
-          await addDoc(facultyCollection, {
-            ...faculty,
-            password: defaultPassword, // Save default password for reference
-            uid: userId,
-          });
-  
-          successCount++;
-          setUploadStatus(`Uploading... ${successCount} added, ${skipCount} skipped.`);
-        } catch (authError) {
-          console.error("Failed to add to Authentication:", authError.message);
-          skipCount++;
-        }
+
+        await setDoc(doc(db, "faculty", userId), {
+          ...faculty,
+          uid: userId,
+          password: defaultPassword,
+        });
+
+        successCount++;
+        setUploadStatus(`Uploading... ${successCount} added, ${skipCount} skipped.`);
+      } catch (error) {
+        console.error("Error uploading faculty:", error);
+        skipCount++;
       }
-  
-      alert(`Upload complete!\nSuccessfully added: ${successCount}\nSkipped entries: ${skipCount}`);
-      setExcelData([]);
-      setUploadStatus("");
-    } catch (error) {
-      console.error("Error uploading faculty data:", error);
-      alert("Failed to upload faculty data. Please try again.");
-      setUploadStatus("");
     }
+
+    setUploadStatus(`Upload complete: ${successCount} added, ${skipCount} skipped.`);
+    setLoading(false);
+    setExcelData([]);
   };
-  
 
   return (
-    <div className="p-6">
-      <h1 className="text-3xl font-bold mb-6">Add Faculty</h1>
-      <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg p-6 mb-6">
-        <div className="grid grid-cols-2 gap-4">
+    <div className="p-6 bg-gray-50 min-h-screen">
+      <h1 className="text-4xl font-bold mb-6 text-blue-700">Add Faculty</h1>
+      <form onSubmit={handleSubmit} className="bg-white shadow-lg rounded-lg p-6 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {Object.keys(initialFields).map((field) => (
             <div key={field}>
-              <label htmlFor={field} className="block text-sm font-medium text-gray-700 capitalize">
-                {field.replace(/([A-Z])/g, " $1").toLowerCase()}
+              <label htmlFor={field} className="block text-sm font-medium text-gray-600">
+                {field.replace(/([A-Z])/g, " $1").toUpperCase()}
               </label>
               <input
                 type="text"
@@ -225,38 +172,43 @@ const AddFaculty = () => {
                 name={field}
                 value={facultyData[field]}
                 onChange={handleChange}
-                className="mt-1 block w-full p-2 border border-gray-300 rounded-lg"
-                required={["empID", "emailID", "password"].includes(field)}
+                className="mt-1 block w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-300"
+                required={field === "empID" || field === "emailID"}
               />
             </div>
           ))}
         </div>
         <button
           type="submit"
-          className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+          disabled={loading}
+          className={`mt-6 px-4 py-2 rounded-lg text-white ${loading ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"}`}
         >
-          Add Faculty
+          {loading ? "Adding Faculty..." : "Add Faculty"}
         </button>
       </form>
 
-      <div className="bg-white shadow rounded-lg p-6">
-        <h2 className="text-2xl font-bold mb-4">Upload Excel File</h2>
+      <div className="bg-white shadow-lg rounded-lg p-6">
+        <h2 className="text-2xl font-bold mb-4 text-blue-600">Upload Excel File</h2>
         <input
           type="file"
           accept=".xlsx, .xls"
           onChange={handleFileUpload}
-          className="block w-full mb-4"
+          className="block w-full mb-4 border rounded-lg p-2"
         />
         <button
           onClick={handleUpload}
-          disabled={excelData.length === 0}
+          disabled={excelData.length === 0 || loading}
           className={`px-4 py-2 rounded-lg text-white ${
-            excelData.length === 0 ? "bg-gray-400 cursor-not-allowed" : "bg-green-500 hover:bg-green-600"
+            excelData.length === 0 || loading ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"
           }`}
         >
-          Upload Bulk Data
+          {loading ? "Uploading..." : "Upload Bulk Data"}
         </button>
-        {uploadStatus && <p className="mt-4 text-sm text-gray-700">{uploadStatus}</p>}
+        {uploadStatus && (
+          <p className="mt-4 text-sm text-gray-700 bg-gray-200 p-2 rounded-md">
+            {uploadStatus}
+          </p>
+        )}
       </div>
     </div>
   );
