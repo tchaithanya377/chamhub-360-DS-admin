@@ -103,12 +103,21 @@ const AddFaculty = () => {
       const jsonData = XLSX.utils.sheet_to_json(worksheet, {
         raw: false,
         defval: "",
-        header: Object.keys(initialFields),
-      }).filter((row) => Object.values(row).some((value) => value !== ""));
+      });
 
-      if (jsonData.length === 0) return alert("No valid data found in the Excel file.");
-      setExcelData(jsonData);
-      setUploadStatus(`Excel file processed. ${jsonData.length} entries found.`);
+      // Extract valid rows
+      const validRows = jsonData.filter((row) => {
+        const email = row["Email ID"];
+        const empId = row["Emp ID"];
+        return email && empId && validateEmail(email);
+      });
+
+      if (validRows.length === 0) {
+        alert("No valid data found in the Excel file.");
+      } else {
+        setExcelData(validRows);
+        setUploadStatus(`Excel file processed. ${validRows.length} entries found.`);
+      }
     };
     reader.readAsArrayBuffer(file);
   };
@@ -118,11 +127,13 @@ const AddFaculty = () => {
     const defaultPassword = "Mits@1234";
     let successCount = 0;
     let skipCount = 0;
+    let skippedRecords = [];
     setLoading(true);
 
     for (const faculty of excelData) {
-      const { empID, emailID } = faculty;
+      const { "Emp ID": empID, "Email ID": emailID } = faculty;
       if (!emailID || !validateEmail(emailID) || !empID) {
+        skippedRecords.push({ reason: "Invalid data", record: faculty });
         skipCount++;
         continue;
       }
@@ -133,24 +144,29 @@ const AddFaculty = () => {
         const q = query(collection(db, "faculty"), where("empID", "==", empID));
         const snapshot = await getDocs(q);
         if (!snapshot.empty) {
+          skippedRecords.push({ reason: "Duplicate empID", record: faculty });
           skipCount++;
           continue;
         }
 
         await setDoc(doc(db, "faculty", userId), {
-          ...faculty,
-          uid: userId,
+          name: faculty["Name of the Faculty"],
+          emailID: emailID,
+          empID: empID,
           password: defaultPassword,
+          uid: userId,
         });
 
         successCount++;
         setUploadStatus(`Uploading... ${successCount} added, ${skipCount} skipped.`);
       } catch (error) {
+        skippedRecords.push({ reason: `Error: ${error.message}`, record: faculty });
         console.error("Error uploading faculty:", error);
         skipCount++;
       }
     }
 
+    console.table(skippedRecords); // Logs skipped records with reasons
     setUploadStatus(`Upload complete: ${successCount} added, ${skipCount} skipped.`);
     setLoading(false);
     setExcelData([]);
