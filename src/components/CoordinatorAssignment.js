@@ -126,7 +126,7 @@ const FacultyManager = () => {
             <option value="" disabled>
               Select a coordinator
             </option>
-            <option value="NPTEL">NPTEL</option>
+            <option value="NPTEL">NPTEL, NAASCOM, MATLAB</option>
             <option value="Student">Student</option>
             <option value="Internship">Internship</option>
             {/* <option value="HOD">HOD</option> */}
