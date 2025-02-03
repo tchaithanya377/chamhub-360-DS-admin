@@ -178,9 +178,7 @@ function Relationships() {
                 <option value="II">II</option>
                 <option value="I">I</option>
               </select>
-            </div>0
-                  
-
+            </div>
             <div>
               <h2 className="text-2xl font-semibold text-gray-700 mb-2">Select Section</h2>
               <select
