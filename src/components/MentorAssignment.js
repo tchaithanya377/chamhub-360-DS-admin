@@ -159,6 +159,8 @@ const AssignMentor = () => {
                 <option value="A">Section A</option>
                 <option value="B">Section B</option>
                 <option value="C">Section C</option>
+                <option value="D">Section D</option>
+                <option value="E">Section E</option>
               </select>
             </div>
           </div>
