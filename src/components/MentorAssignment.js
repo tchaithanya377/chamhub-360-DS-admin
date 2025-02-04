@@ -15,11 +15,10 @@ const AssignMentor = () => {
   const [selectedFaculty, setSelectedFaculty] = useState(null);
   const [selectedYear, setSelectedYear] = useState("");
   const [selectedSection, setSelectedSection] = useState("");
-  const [numStudentsToAssign, setNumStudentsToAssign] = useState(0);
+  const [selectedStudents, setSelectedStudents] = useState(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Fetch faculty data
   useEffect(() => {
     const fetchFaculty = async () => {
       try {
@@ -34,11 +33,9 @@ const AssignMentor = () => {
         alert("Failed to fetch faculty data. Please try again.");
       }
     };
-
     fetchFaculty();
   }, []);
 
-  // Fetch students dynamically based on year and section
   const fetchStudents = async () => {
     if (!selectedYear || !selectedSection) {
       setError("Please select a year and section!");
@@ -62,6 +59,7 @@ const AssignMentor = () => {
         .filter((student) => !student.mentorId);
 
       setStudentData(fetchedStudents);
+      setSelectedStudents(new Set());
     } catch (error) {
       console.error("Error fetching students:", error);
       alert("Failed to fetch students. Please try again.");
@@ -70,63 +68,48 @@ const AssignMentor = () => {
     }
   };
 
-  // Assign mentor to students
   const handleAssignMentor = async () => {
-    if (
-      !selectedFaculty ||
-      !selectedYear ||
-      !selectedSection ||
-      numStudentsToAssign <= 0
-    ) {
-      setError(
-        "Please select a faculty member, year, section, and valid number of students to assign!"
-      );
+    if (!selectedFaculty || selectedStudents.size === 0) {
+      setError("Please select a faculty member and at least one student!");
       return;
     }
     setError("");
-    if (numStudentsToAssign > studentData.length) {
-      alert(`Only ${studentData.length} students are available to assign.`);
-      return;
-    }
-
     try {
-      const studentsToAssign = studentData.slice(0, numStudentsToAssign);
-      const studentIdsToUpdate = [];
-
-      const studentUpdates = studentsToAssign.map(async (student) => {
+      const studentIdsToUpdate = Array.from(selectedStudents);
+      const studentUpdates = studentIdsToUpdate.map(async (studentId) => {
         const studentDoc = doc(
           db,
           `students/${selectedYear}/${selectedSection}`,
-          student.id
+          studentId
         );
         await updateDoc(studentDoc, {
           mentorId: selectedFaculty.id,
           mentorName: selectedFaculty.name,
         });
-        studentIdsToUpdate.push(student.id);
       });
 
       await Promise.all(studentUpdates);
-
-      const facultyDoc = doc(db, "faculty", selectedFaculty.id);
-      const existingStudentIds = selectedFaculty.mantis_student_id || [];
-      await updateDoc(facultyDoc, {
-        mantis_student_id: [...existingStudentIds, ...studentIdsToUpdate],
-      });
-
-      alert(
-        `Mentor ${selectedFaculty.name} (ID: ${selectedFaculty.id}) assigned to ${numStudentsToAssign} students in ${selectedYear} ${selectedSection}.`
-      );
-
+      alert(`Mentor assigned successfully!`);
       setStudentData((prevData) =>
-        prevData.filter(
-          (student) => !studentsToAssign.some((s) => s.id === student.id)
-        )
+        prevData.filter((student) => !selectedStudents.has(student.id))
       );
+      setSelectedStudents(new Set());
     } catch (error) {
       console.error("Error assigning mentor:", error);
       alert("Failed to assign mentor. Please try again.");
     }
+  };
+
+  const toggleStudentSelection = (studentId) => {
+    setSelectedStudents((prevSelected) => {
+      const newSelected = new Set(prevSelected);
+      if (newSelected.has(studentId)) {
+        newSelected.delete(studentId);
+      } else {
+        newSelected.add(studentId);
+      }
+      return newSelected;
+    });
   };
 
   return (
@@ -135,49 +118,33 @@ const AssignMentor = () => {
         Assign Faculty Mentor
       </h1>
 
-      {error && (
-        <p className="text-red-500 bg-red-100 p-2 rounded-md mb-4">{error}</p>
-      )}
+      {error && <p className="text-red-500 bg-red-100 p-2 rounded-md mb-4">{error}</p>}
 
       <div className="bg-white shadow-lg rounded-lg p-6 max-w-4xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div>
-            <label className="block text-lg font-semibold text-gray-700 mb-2">
-              Select Faculty:
-            </label>
+            <label className="block text-lg font-semibold text-gray-700 mb-2">Select Faculty:</label>
             <select
               className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-600"
-              onChange={(e) =>
-                setSelectedFaculty(
-                  facultyData.find((faculty) => faculty.id === e.target.value)
-                )
-              }
+              onChange={(e) => setSelectedFaculty(facultyData.find((faculty) => faculty.id === e.target.value))}
               defaultValue=""
             >
-              <option value="" disabled>
-                Select a faculty member
-              </option>
+              <option value="" disabled>Select a faculty member</option>
               {facultyData.map((faculty) => (
-                <option key={faculty.id} value={faculty.id}>
-                  {faculty.name} (ID: {faculty.id})
-                </option>
+                <option key={faculty.id} value={faculty.id}>{faculty.name} (ID: {faculty.id})</option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="block text-lg font-semibold text-gray-700 mb-2">
-              Select Year and Section:
-            </label>
+            <label className="block text-lg font-semibold text-gray-700 mb-2">Select Year and Section:</label>
             <div className="flex space-x-4">
               <select
                 className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-600"
                 onChange={(e) => setSelectedYear(e.target.value)}
                 defaultValue=""
               >
-                <option value="" disabled>
-                  Select Year
-                </option>
+                <option value="" disabled>Select Year</option>
                 <option value="I">1st Year</option>
                 <option value="II">2nd Year</option>
                 <option value="III">3rd Year</option>
@@ -188,9 +155,7 @@ const AssignMentor = () => {
                 onChange={(e) => setSelectedSection(e.target.value)}
                 defaultValue=""
               >
-                <option value="" disabled>
-                  Select Section
-                </option>
+                <option value="" disabled>Select Section</option>
                 <option value="A">Section A</option>
                 <option value="B">Section B</option>
                 <option value="C">Section C</option>
@@ -199,52 +164,31 @@ const AssignMentor = () => {
           </div>
         </div>
 
-        <div className="mt-8 flex space-x-6">
-          <button
-            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition font-medium"
-            onClick={fetchStudents}
-          >
-            Fetch Students
-          </button>
-          <div className="flex items-center space-x-4">
-            <label className="text-lg font-semibold text-gray-700">
-              Students to Assign:
-            </label>
-            <input
-              type="number"
-              className="w-20 border border-gray-300 rounded-lg px-4 py-2 text-gray-600"
-              value={numStudentsToAssign}
-              onChange={(e) =>
-                setNumStudentsToAssign(parseInt(e.target.value, 10))
-              }
-            />
-          </div>
-        </div>
+        <button
+          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition font-medium"
+          onClick={fetchStudents}
+        >
+          Fetch Students
+        </button>
       </div>
 
       {studentData.length > 0 && (
         <div className="mt-8 max-w-4xl mx-auto bg-white shadow-lg rounded-lg p-6">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">
-            Students Without Mentor
-          </h2>
-          <ul className="divide-y divide-gray-200">
+          <h2 className="text-lg font-bold text-gray-800 mb-4">Students Without Mentor</h2>
+          <ul>
             {studentData.map((student) => (
-              <li
-                key={student.id}
-                className="py-3 flex justify-between items-center"
-              >
-                <p className="font-medium text-gray-700">
-                  {student.name} (Roll No: {student.rollNo})
-                </p>
+              <li key={student.id} className="flex items-center space-x-4">
+                <input type="checkbox" onChange={() => toggleStudentSelection(student.id)} />
+                <p>{student.name} (Roll No: {student.rollNo})</p>
               </li>
             ))}
           </ul>
         </div>
       )}
 
-      <div className="mt-8 max-w-4xl mx-auto">
+<div className="mt-8 max-w-4xl mx-auto">
         <button
-          className="w-full bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 font-semibold text-lg shadow-lg transition"
+          className="mt-4 w-full bg-purple-500 text-white px-4 py-2 rounded-md border border-gray-700"
           onClick={handleAssignMentor}
         >
           Assign Mentor
