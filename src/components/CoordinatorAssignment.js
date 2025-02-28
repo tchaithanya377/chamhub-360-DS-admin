@@ -137,6 +137,8 @@ const FacultyManager = () => {
             <option value="MATLAB">MATLAB</option>
             <option value="Training-Coordinator">Training Coordinator</option>
             <option value="Course-Survey">Course Survey</option>
+            <option value="AICTE Parakh">AICTE Parakh</option>
+            <option value="Faculy Feedback">Course Survey</option>
           </select>
 
           <button
