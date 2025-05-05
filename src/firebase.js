@@ -5,14 +5,15 @@ import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBUYVky7ehZvrK39MUoSVgdHDThuC8wvR8",
-  authDomain: "ch360-mca.firebaseapp.com",
-  projectId: "ch360-mca",
-  storageBucket: "ch360-mca.firebasestorage.app",
-  messagingSenderId: "430833021852",
-  appId: "1:430833021852:web:dc64dd8ebea0cbe7658e59",
-  measurementId: "G-0312RBY65S"
+  apiKey: "AIzaSyC1ekZDZR1-6dh3E_0rShNa279iwe-JVCY",
+  authDomain: "csd-nodues.firebaseapp.com",
+  projectId: "csd-nodues",
+  storageBucket: "csd-nodues.firebasestorage.app",
+  messagingSenderId: "787881916826",
+  appId: "1:787881916826:web:8a497747a086d010322223",
+  measurementId: "G-YKB417NSXQ"
 };
+
 
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
