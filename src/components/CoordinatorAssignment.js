@@ -6,6 +6,7 @@ const FacultyManager = () => {
   const [facultyData, setFacultyData] = useState([]);
   const [selectedFaculty, setSelectedFaculty] = useState(null);
   const [newCoordinator, setNewCoordinator] = useState(""); // Track the selected coordinator value
+  const [customCoordinator, setCustomCoordinator] = useState(""); // Track custom coordinator input
   const [loading, setLoading] = useState(true);
 
   // Fetch faculty data from Firestore
@@ -46,6 +47,14 @@ const FacultyManager = () => {
       return;
     }
 
+    // If custom coordinator is selected, use the custom input value
+    const coordinatorValue = newCoordinator === "custom" ? customCoordinator : newCoordinator;
+
+    if (newCoordinator === "custom" && !customCoordinator.trim()) {
+      alert("Please enter a custom coordinator name!");
+      return;
+    }
+
     const facultyDoc = doc(db, "faculty", selectedFaculty.id);
 
     try {
@@ -57,16 +66,16 @@ const FacultyManager = () => {
       }
 
       // Update the coordinator field in Firestore
-      await updateDoc(facultyDoc, { coordinator: newCoordinator });
+      await updateDoc(facultyDoc, { coordinator: coordinatorValue });
       alert("Coordinator updated successfully!");
 
       // Update local state to reflect changes
       setFacultyData((prevData) =>
         prevData.map((f) =>
-          f.id === selectedFaculty.id ? { ...f, coordinator: newCoordinator } : f
+          f.id === selectedFaculty.id ? { ...f, coordinator: coordinatorValue } : f
         )
       );
-      setSelectedFaculty((prev) => ({ ...prev, coordinator: newCoordinator }));
+      setSelectedFaculty((prev) => ({ ...prev, coordinator: coordinatorValue }));
     } catch (error) {
       console.error("Error updating coordinator:", error);
       alert("Failed to update the coordinator. Please try again.");
@@ -129,7 +138,6 @@ const FacultyManager = () => {
             <option value="NPTEL,NAASCOM">NPTEL, NAASCOM, MATLAB</option>
             <option value="Student">Student</option>
             <option value="Internship">Internship</option>
-            {/* <option value="HOD">HOD</option> */}
             <option value="Palacement">Palacement</option>
             <option value="AICT_360_feedback">AICT_360_feedback</option>
             <option value="Project">Project</option>
@@ -139,7 +147,23 @@ const FacultyManager = () => {
             <option value="Course-Survey">Course Survey</option>
             <option value="AICTE Parakh">AICTE Parakh</option>
             <option value="Faculy Feedback">Faculy Feedback</option>
+            <option value="custom">Add New Coordinator</option>
           </select>
+
+          {newCoordinator === "custom" && (
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Enter New Coordinator Name:
+              </label>
+              <input
+                type="text"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                value={customCoordinator}
+                onChange={(e) => setCustomCoordinator(e.target.value)}
+                placeholder="Enter coordinator name"
+              />
+            </div>
+          )}
 
           <button
             className="mt-6 w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition"
